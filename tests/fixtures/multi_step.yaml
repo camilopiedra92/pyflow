@@ -1,0 +1,24 @@
+# tests/fixtures/multi_step.yaml
+name: multi-step-test
+description: Integration test with multiple node types
+trigger:
+  type: manual
+nodes:
+  - id: start
+    type: condition
+    config:
+      if: "True"
+
+  - id: transform
+    type: transform
+    depends_on: [start]
+    config:
+      input:
+        items: [1, 2, 3, 4, 5]
+      expression: "$.items[*]"
+
+  - id: check
+    type: condition
+    depends_on: [transform]
+    config:
+      if: "len(transform) == 5"
