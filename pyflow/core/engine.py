@@ -135,6 +135,11 @@ class WorkflowEngine:
         node_cls = self._registry.get(node_def.type)
         node = node_cls()
 
+        # Validate config against Pydantic model if available
+        if hasattr(node_cls, "config_model") and node_cls.config_model is not None:
+            config = node_cls.config_model(**config).model_dump(by_alias=True)
+
+
         try:
             nlog.info("node.start")
             result = await node.execute(config, ctx)

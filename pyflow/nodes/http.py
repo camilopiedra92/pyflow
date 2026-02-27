@@ -8,6 +8,7 @@ import httpx
 
 from pyflow.core.context import ExecutionContext
 from pyflow.core.node import BaseNode
+from pyflow.nodes.schemas import HttpConfig, HttpResponse
 
 
 _MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -45,18 +46,30 @@ def _validate_url(url: str, *, allow_private: bool = False) -> None:
                 )
 
 
-class HttpNode(BaseNode):
+class HttpNode(BaseNode[HttpConfig, HttpResponse]):
     node_type = "http"
+    config_model = HttpConfig
+    response_model = HttpResponse
 
-    async def execute(self, config: dict, context: ExecutionContext) -> object:
-        method = config.get("method", "GET").upper()
-        url = config["url"]
-        headers = config.get("headers", {})
-        body = config.get("body")
-        timeout = config.get("timeout", 30)
-        raise_for_status = config.get("raise_for_status", True)
-        max_response_size = config.get("max_response_size", _MAX_RESPONSE_SIZE)
-        allow_private = config.get("allow_private_networks", False)
+    async def execute(self, config: dict | HttpConfig, context: ExecutionContext) -> object:
+        if isinstance(config, HttpConfig):
+            method = config.method
+            url = config.url
+            headers = config.headers
+            body = config.body
+            timeout = config.timeout
+            raise_for_status = config.raise_for_status
+            max_response_size = config.max_response_size
+            allow_private = config.allow_private_networks
+        else:
+            method = config.get("method", "GET").upper()
+            url = config["url"]
+            headers = config.get("headers", {})
+            body = config.get("body")
+            timeout = config.get("timeout", 30)
+            raise_for_status = config.get("raise_for_status", True)
+            max_response_size = config.get("max_response_size", _MAX_RESPONSE_SIZE)
+            allow_private = config.get("allow_private_networks", False)
 
         _validate_url(url, allow_private=allow_private)
 

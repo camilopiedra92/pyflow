@@ -4,6 +4,7 @@ from pyflow.core.node import NodeRegistry
 from pyflow.nodes.alert import AlertNode
 from pyflow.nodes.condition import ConditionNode
 from pyflow.nodes.http import HttpNode
+from pyflow.nodes.llm import LLMNode
 from pyflow.nodes.storage import StorageNode
 from pyflow.nodes.transform import TransformNode
 
@@ -13,3 +14,4 @@ default_registry.register(TransformNode)
 default_registry.register(ConditionNode)
 default_registry.register(AlertNode)
 default_registry.register(StorageNode)
+default_registry.register(LLMNode)

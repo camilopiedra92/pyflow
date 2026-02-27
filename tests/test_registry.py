@@ -16,3 +16,6 @@ class TestDefaultRegistry:
 
     def test_has_storage(self):
         assert "storage" in default_registry.list_types()
+
+    def test_has_llm(self):
+        assert "llm" in default_registry.list_types()

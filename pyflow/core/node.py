@@ -1,16 +1,28 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import Any, ClassVar, Generic, TypeVar
+
+from pydantic import BaseModel
 
 from pyflow.core.context import ExecutionContext
 
+TConfig = TypeVar("TConfig")
+TResponse = TypeVar("TResponse")
 
-class BaseNode(ABC):
+
+class BaseNode(ABC, Generic[TConfig, TResponse]):
     node_type: ClassVar[str]
+    config_model: ClassVar[type[BaseModel] | None] = None
+    response_model: ClassVar[type[BaseModel] | None] = None
+
+    def validate_config(self, raw: dict[str, Any]) -> TConfig:
+        if self.config_model is not None:
+            return self.config_model(**raw)
+        return raw
 
     @abstractmethod
-    async def execute(self, config: dict, context: ExecutionContext) -> object:
+    async def execute(self, config: dict | TConfig, context: ExecutionContext) -> object:
         ...
 
 

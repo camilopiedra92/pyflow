@@ -7,16 +7,23 @@ from jsonpath_ng.ext import parse as jsonpath_parse
 from pyflow.core.context import ExecutionContext
 from pyflow.core.node import BaseNode
 from pyflow.core.template import resolve_templates
+from pyflow.nodes.schemas import TransformConfig
 
 # Pattern matching a pure template variable reference like "{{ var_name }}"
 _PURE_VAR_RE = re.compile(r"^\{\{\s*(\w+)\s*\}\}$")
 
 
-class TransformNode(BaseNode):
+class TransformNode(BaseNode[TransformConfig, object]):
     node_type = "transform"
+    config_model = TransformConfig
 
-    async def execute(self, config: dict, context: ExecutionContext) -> object:
-        input_data = config.get("input")
+    async def execute(self, config: dict | TransformConfig, context: ExecutionContext) -> object:
+        if isinstance(config, TransformConfig):
+            input_data = config.input
+            expression = config.expression
+        else:
+            input_data = config.get("input")
+            expression = config["expression"]
 
         if isinstance(input_data, str):
             # If input is a pure variable reference (e.g. "{{ prev }}"), resolve
@@ -29,7 +36,6 @@ class TransformNode(BaseNode):
             elif "{{" in input_data:
                 input_data = resolve_templates(input_data, context)
 
-        expression = config["expression"]
         matches = jsonpath_parse(expression).find(input_data)
 
         if len(matches) == 1:

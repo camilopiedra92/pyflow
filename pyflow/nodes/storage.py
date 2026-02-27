@@ -5,15 +5,22 @@ from pathlib import Path
 
 from pyflow.core.context import ExecutionContext
 from pyflow.core.node import BaseNode
+from pyflow.nodes.schemas import StorageConfig
 
 
-class StorageNode(BaseNode):
+class StorageNode(BaseNode[StorageConfig, object]):
     node_type = "storage"
+    config_model = StorageConfig
 
-    async def execute(self, config: dict, context: ExecutionContext) -> object:
-        path = Path(config["path"])
-        action = config.get("action", "read")
-        data = config.get("data")
+    async def execute(self, config: dict | StorageConfig, context: ExecutionContext) -> object:
+        if isinstance(config, StorageConfig):
+            path = Path(config.path)
+            action = config.action
+            data = config.data
+        else:
+            path = Path(config["path"])
+            action = config.get("action", "read")
+            data = config.get("data")
 
         if action == "read":
             if not path.exists():
