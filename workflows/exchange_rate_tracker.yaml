@@ -10,7 +10,7 @@ nodes:
   - id: fetch_rate
     type: http
     config:
-      url: "https://v6.exchangerate-api.com/v6/latest/USD"
+      url: "https://open.er-api.com/v6/latest/USD"
       timeout: 15
 
   - id: extract_cop
@@ -18,7 +18,7 @@ nodes:
     depends_on: [fetch_rate]
     config:
       input: "{{ fetch_rate }}"
-      expression: "$.body.conversion_rates.COP"
+      expression: "$.body.rates.COP"
 
   - id: load_history
     type: storage
