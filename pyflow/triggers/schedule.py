@@ -15,6 +15,13 @@ class ScheduleTrigger:
         self.interval_seconds: int | None = trigger_def.config.get("interval_seconds")
         if not self.cron and not self.interval_seconds:
             raise ValueError("Schedule trigger requires 'cron' or 'interval_seconds'")
+        if self.cron:
+            parts = self.cron.split()
+            if len(parts) != 5:
+                raise ValueError(
+                    f"Cron expression must have exactly 5 parts "
+                    f"(minute hour day month day_of_week), got {len(parts)}: '{self.cron}'"
+                )
 
     def register(self, scheduler: AsyncIOScheduler, callback: Callable) -> None:
         if self.cron:

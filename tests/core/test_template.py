@@ -41,3 +41,8 @@ class TestResolveTemplates:
         ctx = self._make_ctx()
         with pytest.raises(Exception):
             resolve_templates("{{ nonexistent.field }}", ctx)
+
+    def test_sandboxed_blocks_class_mro_subclasses(self):
+        ctx = self._make_ctx()
+        with pytest.raises(Exception):
+            resolve_templates("{{ ''.__class__.__mro__[1].__subclasses__() }}", ctx)

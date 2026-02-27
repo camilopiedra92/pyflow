@@ -152,3 +152,36 @@ class TestWorkflowEngine:
         engine = WorkflowEngine(registry=make_registry())
         ctx = await engine.run(wf)
         assert ctx.get_result("b") == "got: hello"
+
+    async def test_depends_on_nonexistent_node_raises(self):
+        wf = WorkflowDef(
+            name="bad-deps",
+            trigger={"type": "manual"},
+            nodes=[
+                {
+                    "id": "a",
+                    "type": "append",
+                    "depends_on": ["nonexistent"],
+                    "config": {"value": "a"},
+                },
+            ],
+        )
+        engine = WorkflowEngine(registry=make_registry())
+        with pytest.raises(ValueError, match="does not exist"):
+            await engine.run(wf)
+
+    async def test_gather_handles_exceptions(self):
+        """When a node raises an unhandled exception via gather, it should
+        be recorded as an error and not crash the engine."""
+        wf = WorkflowDef(
+            name="gather-exc",
+            trigger={"type": "manual"},
+            nodes=[
+                {"id": "a", "type": "failing", "config": {}, "on_error": "skip"},
+                {"id": "b", "type": "append", "config": {"value": "b"}},
+            ],
+        )
+        engine = WorkflowEngine(registry=make_registry())
+        ctx = await engine.run(wf)
+        assert ctx.has_error("a")
+        assert ctx.get_result("b") == "b"

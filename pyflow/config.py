@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 
 
-def configure_logging(json_output: bool = False) -> None:
+def configure_logging(json_output: bool = False, level: int = 20) -> None:
     processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
@@ -16,5 +16,5 @@ def configure_logging(json_output: bool = False) -> None:
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(0),
+        wrapper_class=structlog.make_filtering_bound_logger(level),
     )

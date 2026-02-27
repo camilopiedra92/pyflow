@@ -16,9 +16,5 @@ def load_workflow(path: Path) -> WorkflowDef:
 
 
 def load_all_workflows(directory: Path) -> list[WorkflowDef]:
-    workflows = []
-    for path in sorted(directory.glob("*.yaml")):
-        workflows.append(load_workflow(path))
-    for path in sorted(directory.glob("*.yml")):
-        workflows.append(load_workflow(path))
-    return workflows
+    paths = sorted([*directory.glob("*.yaml"), *directory.glob("*.yml")])
+    return [load_workflow(path) for path in paths]

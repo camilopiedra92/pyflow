@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class OnError(StrEnum):
@@ -14,8 +14,8 @@ class OnError(StrEnum):
 class NodeDef(BaseModel):
     id: str
     type: str
-    config: dict = {}
-    depends_on: list[str] = []
+    config: dict = Field(default_factory=dict)
+    depends_on: list[str] = Field(default_factory=list)
     when: str | None = None
     on_error: OnError = OnError.STOP
     retry: dict | None = None
@@ -23,7 +23,7 @@ class NodeDef(BaseModel):
 
 class TriggerDef(BaseModel):
     type: str
-    config: dict = {}
+    config: dict = Field(default_factory=dict)
 
 
 class WorkflowDef(BaseModel):
@@ -35,8 +35,9 @@ class WorkflowDef(BaseModel):
     @field_validator("nodes")
     @classmethod
     def validate_unique_ids(cls, nodes: list[NodeDef]) -> list[NodeDef]:
-        ids = [n.id for n in nodes]
-        duplicates = [i for i in ids if ids.count(i) > 1]
-        if duplicates:
-            raise ValueError(f"Duplicate node id: {duplicates[0]}")
+        seen: set[str] = set()
+        for node in nodes:
+            if node.id in seen:
+                raise ValueError(f"Duplicate node id: {node.id}")
+            seen.add(node.id)
         return nodes

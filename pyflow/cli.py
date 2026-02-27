@@ -20,7 +20,11 @@ def run(workflow_path: Path) -> None:
     wf = load_workflow(workflow_path)
     typer.echo(f"Running workflow: {wf.name}")
     engine = WorkflowEngine(registry=default_registry)
-    ctx = asyncio.run(engine.run(wf))
+    try:
+        ctx = asyncio.run(engine.run(wf))
+    except Exception as exc:
+        typer.echo(f"Workflow failed: {exc}", err=True)
+        raise typer.Exit(code=1)
     typer.echo(f"Completed. Run ID: {ctx.run_id}")
     for node_id in [n.id for n in wf.nodes]:
         if ctx.has_result(node_id):
@@ -57,7 +61,7 @@ def list_workflows(directory: Path = typer.Argument(default=Path("workflows"))) 
 @app.command()
 def serve(
     workflows_dir: Path = typer.Argument(default=Path("workflows")),
-    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
     port: int = typer.Option(8000, help="Port to bind to"),
 ) -> None:
     """Start PyFlow server with webhook listeners and schedulers."""

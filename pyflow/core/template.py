@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from jinja2 import Environment, StrictUndefined
+from jinja2 import StrictUndefined
+from jinja2.sandbox import SandboxedEnvironment
 
 from pyflow.core.context import ExecutionContext
 
 
-_env = Environment(undefined=StrictUndefined)
+_env = SandboxedEnvironment(undefined=StrictUndefined)
 
 
 def resolve_templates(value: Any, context: ExecutionContext) -> Any:
