@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 
 import structlog
 
@@ -26,6 +27,8 @@ class WorkflowEngine:
     ) -> ExecutionContext:
         run_id = run_id or str(uuid.uuid4())
         ctx = ExecutionContext(workflow_name=workflow.name, run_id=run_id)
+        ctx.set_result("__run_id__", run_id)
+        ctx.set_result("__workflow__", workflow.name)
         if initial_context:
             for key, value in initial_context.items():
                 ctx.set_result(key, value)
@@ -110,6 +113,9 @@ class WorkflowEngine:
         log: structlog.stdlib.BoundLogger,
     ) -> object:
         nlog = log.bind(node_id=node_def.id, node_type=node_def.type)
+
+        # Inject current timestamp so templates can use {{ __now__ }}
+        ctx.set_result("__now__", datetime.now(timezone.utc).isoformat())
 
         # Check 'when' condition
         if node_def.when:

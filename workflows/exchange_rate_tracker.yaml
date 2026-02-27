@@ -41,6 +41,10 @@ nodes:
       data:
         pair: "USDCOP"
         rate: "{{ extract_cop }}"
+        timestamp: "{{ __now__ }}"
+        run_id: "{{ __run_id__ }}"
+        base_currency: "USD"
+        target_currency: "COP"
 
   - id: alert_slack
     type: alert
@@ -48,4 +52,4 @@ nodes:
     when: "check_change == True"
     config:
       webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-      message: "USDCOP rate changed significantly! Current rate: {{ extract_cop }}"
+      message: "USDCOP rate changed significantly! Current rate: {{ extract_cop }} at {{ __now__ }}"
