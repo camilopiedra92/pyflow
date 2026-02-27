@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from pyflow.config import configure_logging
 from pyflow.core.engine import WorkflowEngine
 from pyflow.core.loader import load_all_workflows, load_workflow
 from pyflow.nodes import default_registry
@@ -15,6 +16,7 @@ app = typer.Typer(name="pyflow", help="PyFlow — Workflow Automation Engine")
 @app.command()
 def run(workflow_path: Path) -> None:
     """Execute a workflow from a YAML file."""
+    configure_logging()
     wf = load_workflow(workflow_path)
     typer.echo(f"Running workflow: {wf.name}")
     engine = WorkflowEngine(registry=default_registry)
@@ -59,6 +61,7 @@ def serve(
     port: int = typer.Option(8000, help="Port to bind to"),
 ) -> None:
     """Start PyFlow server with webhook listeners and schedulers."""
+    configure_logging()
     import uvicorn
     from pyflow.server import create_app
 
