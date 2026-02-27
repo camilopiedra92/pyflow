@@ -50,3 +50,18 @@ def list_workflows(directory: Path = typer.Argument(default=Path("workflows"))) 
     for wf in workflows:
         trigger = wf.trigger.type
         typer.echo(f"  {wf.name} [{trigger}] ({len(wf.nodes)} nodes)")
+
+
+@app.command()
+def serve(
+    workflows_dir: Path = typer.Argument(default=Path("workflows")),
+    host: str = typer.Option("0.0.0.0", help="Host to bind to"),
+    port: int = typer.Option(8000, help="Port to bind to"),
+) -> None:
+    """Start PyFlow server with webhook listeners and schedulers."""
+    import uvicorn
+    from pyflow.server import create_app
+
+    fastapi_app = create_app(workflows_dir)
+    typer.echo(f"Starting PyFlow server on {host}:{port}")
+    uvicorn.run(fastapi_app, host=host, port=port)
