@@ -1,0 +1,19 @@
+# workflows/example.yaml
+name: example-webhook-handler
+description: Example workflow that receives a webhook and logs the payload
+trigger:
+  type: manual
+nodes:
+  - id: check-input
+    type: condition
+    config:
+      if: "True"
+
+  - id: transform-data
+    type: transform
+    depends_on: [check-input]
+    config:
+      input:
+        message: "Hello from PyFlow!"
+        items: [1, 2, 3]
+      expression: "$.message"
