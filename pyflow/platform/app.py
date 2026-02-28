@@ -80,6 +80,7 @@ class PyFlowPlatform:
         self.workflows = WorkflowRegistry()
         self.executor = WorkflowExecutor(tz_name=self.config.timezone)
         self._a2a = AgentCardGenerator(base_url=f"http://{self.config.host}:{self.config.port}")
+        self._agent_cards: list[AgentCard] = []
         self._booted = False
 
     async def boot(self) -> None:
@@ -107,6 +108,10 @@ class PyFlowPlatform:
         # 3. Hydrate workflows (resolve tool refs -> ADK agents)
         self.workflows.hydrate(self.tools)
         log.info("workflows.hydrated")
+
+        # 4. Generate A2A agent cards from workflows with a2a: section
+        self._agent_cards = self._a2a.generate_cards(self.workflows.list_workflows())
+        log.info("a2a.cards_generated", count=len(self._agent_cards))
 
         self._booted = True
         log.info("platform.ready")
@@ -145,9 +150,9 @@ class PyFlowPlatform:
         return self.workflows.list_workflows()
 
     def agent_cards(self) -> list[AgentCard]:
-        """Load A2A agent cards from agent package directories."""
+        """Return A2A agent cards generated at boot from workflow definitions."""
         self._ensure_booted()
-        return self._a2a.load_all(Path(self.config.workflows_dir))
+        return self._agent_cards
 
     @property
     def is_booted(self) -> bool:

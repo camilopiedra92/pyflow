@@ -89,6 +89,21 @@ async def test_boot_sets_booted_flag() -> None:
     assert p.is_booted is True
 
 
+@pytest.mark.asyncio
+async def test_boot_generates_agent_cards() -> None:
+    """boot() generates and caches A2A agent cards from workflows."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    p.tools.discover = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.hydrate = MagicMock()
+    p.workflows.list_workflows = MagicMock(return_value=[])
+
+    await p.boot()
+
+    assert p._agent_cards == []
+
+
 # ---------------------------------------------------------------------------
 # Before-boot guard tests
 # ---------------------------------------------------------------------------
@@ -184,18 +199,15 @@ def test_list_workflows_delegates_to_registry() -> None:
     assert result == []
 
 
-def test_agent_cards_delegates_to_generator() -> None:
-    """agent_cards() loads from files via load_all()."""
+def test_agent_cards_returns_cached_cards() -> None:
+    """agent_cards() returns cards cached during boot."""
     p = _make_booted_platform()
-
     fake_card = AgentCard(name="test", url="http://localhost:8000/a2a/test")
-    p._a2a.load_all = MagicMock(return_value=[fake_card])
+    p._agent_cards = [fake_card]
 
     result = p.agent_cards()
 
-    p._a2a.load_all.assert_called_once_with(Path(p.config.workflows_dir))
     assert len(result) == 1
-    assert isinstance(result[0], AgentCard)
     assert result[0].name == "test"
 
 
