@@ -23,6 +23,24 @@ class A2AConfig(BaseModel):
     skills: list[SkillDef] = []
 
 
+class RuntimeConfig(BaseModel):
+    """ADK runtime service configuration for a workflow."""
+
+    session_service: Literal["in_memory", "sqlite", "database"] = "in_memory"
+    session_db_url: str | None = None
+    memory_service: Literal["in_memory", "none"] = "none"
+    artifact_service: Literal["in_memory", "file", "none"] = "none"
+    artifact_dir: str | None = None
+    plugins: list[str] = []
+
+
+class DagNode(BaseModel):
+    """A node in a DAG orchestration with dependency edges."""
+
+    agent: str
+    depends_on: list[str] = []
+
+
 class OrchestrationConfig(BaseModel):
     """Defines how agents are orchestrated within a workflow."""
 

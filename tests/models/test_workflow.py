@@ -4,7 +4,14 @@ import pytest
 from pydantic import ValidationError
 
 from pyflow.models.agent import AgentConfig
-from pyflow.models.workflow import A2AConfig, OrchestrationConfig, SkillDef, WorkflowDef
+from pyflow.models.workflow import (
+    A2AConfig,
+    DagNode,
+    OrchestrationConfig,
+    RuntimeConfig,
+    SkillDef,
+    WorkflowDef,
+)
 
 
 class TestSkillDef:
@@ -39,6 +46,54 @@ class TestA2AConfig:
         )
         assert a2a.version == "2.0.0"
         assert len(a2a.skills) == 1
+
+
+class TestRuntimeConfig:
+    def test_defaults(self):
+        config = RuntimeConfig()
+        assert config.session_service == "in_memory"
+        assert config.session_db_url is None
+        assert config.memory_service == "none"
+        assert config.artifact_service == "none"
+        assert config.artifact_dir is None
+        assert config.plugins == []
+
+    def test_all_fields(self):
+        config = RuntimeConfig(
+            session_service="sqlite",
+            session_db_url="sqlite+aiosqlite:///test.db",
+            memory_service="in_memory",
+            artifact_service="file",
+            artifact_dir="./artifacts",
+            plugins=["logging", "reflect_and_retry"],
+        )
+        assert config.session_service == "sqlite"
+        assert config.memory_service == "in_memory"
+        assert config.artifact_service == "file"
+        assert config.plugins == ["logging", "reflect_and_retry"]
+
+    def test_invalid_session_service(self):
+        with pytest.raises(ValidationError):
+            RuntimeConfig(session_service="redis")
+
+    def test_invalid_memory_service(self):
+        with pytest.raises(ValidationError):
+            RuntimeConfig(memory_service="redis")
+
+    def test_invalid_artifact_service(self):
+        with pytest.raises(ValidationError):
+            RuntimeConfig(artifact_service="s3")
+
+
+class TestDagNode:
+    def test_minimal(self):
+        node = DagNode(agent="fetcher")
+        assert node.agent == "fetcher"
+        assert node.depends_on == []
+
+    def test_with_dependencies(self):
+        node = DagNode(agent="merger", depends_on=["a", "b"])
+        assert node.depends_on == ["a", "b"]
 
 
 class TestOrchestrationConfig:
