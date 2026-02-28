@@ -184,3 +184,93 @@ class TestPlatformRunnerRun:
                 )
 
                 mock_types.Part.assert_called_once_with(text="")
+
+    async def test_run_includes_usage_metadata(self) -> None:
+        runner = PlatformRunner()
+
+        mock_agent = MagicMock()
+        mock_agent.name = "test-agent"
+
+        mock_session = MagicMock()
+        mock_session.id = "session-1"
+
+        session_manager = MagicMock(spec=SessionManager)
+        session_manager.service = MagicMock()
+        session_manager.create_session = AsyncMock(return_value=mock_session)
+
+        event = _make_event(is_final=True, text="Hello", author="test-agent")
+        event.usage_metadata = {"prompt_tokens": 10, "completion_tokens": 20}
+
+        async def mock_run_async(**kwargs):
+            yield event
+
+        with patch("pyflow.platform.runner.engine.Runner") as MockRunner:
+            mock_runner_instance = MagicMock()
+            mock_runner_instance.run_async = mock_run_async
+            MockRunner.return_value = mock_runner_instance
+
+            result = await runner.run(
+                agent=mock_agent,
+                input_data={"message": "Hi"},
+                session_manager=session_manager,
+            )
+
+        assert result["usage_metadata"] == {"prompt_tokens": 10, "completion_tokens": 20}
+
+    async def test_run_empty_response_has_null_usage_metadata(self) -> None:
+        runner = PlatformRunner()
+
+        mock_agent = MagicMock()
+        mock_agent.name = "test-agent"
+
+        mock_session = MagicMock()
+        mock_session.id = "session-1"
+
+        session_manager = MagicMock(spec=SessionManager)
+        session_manager.service = MagicMock()
+        session_manager.create_session = AsyncMock(return_value=mock_session)
+
+        async def mock_run_async(**kwargs):
+            yield _make_event(is_final=False)
+
+        with patch("pyflow.platform.runner.engine.Runner") as MockRunner:
+            mock_runner_instance = MagicMock()
+            mock_runner_instance.run_async = mock_run_async
+            MockRunner.return_value = mock_runner_instance
+
+            result = await runner.run(
+                agent=mock_agent,
+                input_data={"message": "Hi"},
+                session_manager=session_manager,
+            )
+
+        assert result["usage_metadata"] is None
+
+    async def test_run_propagates_runner_errors(self) -> None:
+        runner = PlatformRunner()
+
+        mock_agent = MagicMock()
+        mock_agent.name = "test-agent"
+
+        mock_session = MagicMock()
+        mock_session.id = "session-1"
+
+        session_manager = MagicMock(spec=SessionManager)
+        session_manager.service = MagicMock()
+        session_manager.create_session = AsyncMock(return_value=mock_session)
+
+        async def mock_run_async(**kwargs):
+            raise RuntimeError("LLM provider unavailable")
+            yield  # noqa: RUF027 — make this an async generator
+
+        with patch("pyflow.platform.runner.engine.Runner") as MockRunner:
+            mock_runner_instance = MagicMock()
+            mock_runner_instance.run_async = mock_run_async
+            MockRunner.return_value = mock_runner_instance
+
+            with pytest.raises(RuntimeError, match="LLM provider unavailable"):
+                await runner.run(
+                    agent=mock_agent,
+                    input_data={"message": "Hi"},
+                    session_manager=session_manager,
+                )

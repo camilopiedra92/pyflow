@@ -40,13 +40,17 @@ class PlatformRunner:
         )
 
         final_response = None
-        async for event in runner.run_async(
-            user_id="default",
-            session_id=session.id,
-            new_message=user_message,
-        ):
-            if event.is_final_response() and event.content:
-                final_response = event
+        try:
+            async for event in runner.run_async(
+                user_id="default",
+                session_id=session.id,
+                new_message=user_message,
+            ):
+                if event.is_final_response() and event.content:
+                    final_response = event
+        except Exception:
+            logger.exception("runner.failed", agent=agent.name, session_id=session.id)
+            raise
 
         if final_response and final_response.content:
             text = (
@@ -54,11 +58,15 @@ class PlatformRunner:
                 if final_response.content.parts
                 else ""
             )
+            usage = None
+            if hasattr(final_response, "usage_metadata") and final_response.usage_metadata:
+                usage = final_response.usage_metadata
             logger.info("runner.completed", agent=agent.name, author=final_response.author)
             return {
                 "content": text,
                 "author": final_response.author,
+                "usage_metadata": usage,
             }
 
         logger.info("runner.completed_empty", agent=agent.name)
-        return {"content": "", "author": agent.name}
+        return {"content": "", "author": agent.name, "usage_metadata": None}

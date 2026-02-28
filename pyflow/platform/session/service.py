@@ -32,6 +32,14 @@ class SessionManager:
         logger.info("session.created", app_name=app_name, user_id=user_id, session_id=session.id)
         return session
 
+    async def get_session(
+        self, app_name: str, user_id: str, session_id: str
+    ) -> Session | None:
+        """Retrieve an existing session by ID."""
+        return await self.service.get_session(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
+
     async def cleanup(self) -> None:
         """Tear down the session service."""
         self._service = None

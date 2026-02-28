@@ -54,6 +54,38 @@ class TestSessionManagerCreateSession:
             )
 
 
+class TestSessionManagerGetSession:
+    async def test_get_session(self) -> None:
+        manager = SessionManager()
+        await manager.initialize()
+
+        mock_session = MagicMock()
+        mock_session.id = "session-789"
+
+        with patch.object(
+            manager._service, "get_session", new_callable=AsyncMock, return_value=mock_session
+        ):
+            session = await manager.get_session(
+                app_name="test-app", user_id="user-1", session_id="session-789"
+            )
+            assert session.id == "session-789"
+            manager._service.get_session.assert_awaited_once_with(
+                app_name="test-app", user_id="user-1", session_id="session-789"
+            )
+
+    async def test_get_session_returns_none_for_missing(self) -> None:
+        manager = SessionManager()
+        await manager.initialize()
+
+        with patch.object(
+            manager._service, "get_session", new_callable=AsyncMock, return_value=None
+        ):
+            session = await manager.get_session(
+                app_name="test-app", user_id="user-1", session_id="nonexistent"
+            )
+            assert session is None
+
+
 class TestSessionManagerCleanup:
     async def test_cleanup_resets_service(self) -> None:
         manager = SessionManager()
