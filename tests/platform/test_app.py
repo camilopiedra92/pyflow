@@ -41,8 +41,7 @@ def test_init_defaults(platform: PyFlowPlatform) -> None:
     assert platform.config == PlatformConfig()
     assert platform.tools is not None
     assert platform.workflows is not None
-    assert platform.sessions is not None
-    assert platform.runner is not None
+    assert platform.executor is not None
     assert platform.is_booted is False
 
 
@@ -65,14 +64,12 @@ async def test_boot_lifecycle() -> None:
     p.tools.discover = MagicMock()
     p.workflows.discover = MagicMock()
     p.workflows.hydrate = MagicMock()
-    p.sessions.initialize = AsyncMock()
 
     await p.boot()
 
     p.tools.discover.assert_called_once()
     p.workflows.discover.assert_called_once_with(Path(p.config.workflows_dir))
     p.workflows.hydrate.assert_called_once_with(p.tools)
-    p.sessions.initialize.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -82,7 +79,6 @@ async def test_boot_sets_booted_flag() -> None:
     p.tools.discover = MagicMock()
     p.workflows.discover = MagicMock()
     p.workflows.hydrate = MagicMock()
-    p.sessions.initialize = AsyncMock()
 
     assert p.is_booted is False
     await p.boot()
@@ -126,7 +122,7 @@ def _make_booted_platform() -> PyFlowPlatform:
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_delegates_to_runner() -> None:
+async def test_run_workflow_delegates_to_executor() -> None:
     p = _make_booted_platform()
 
     fake_agent = MagicMock()
@@ -135,12 +131,15 @@ async def test_run_workflow_delegates_to_runner() -> None:
 
     p.workflows.get = MagicMock(return_value=fake_hw)
     expected = RunResult(content="done")
-    p.runner.run = AsyncMock(return_value=expected)
+    fake_runner = MagicMock()
+    p.executor.build_runner = MagicMock(return_value=fake_runner)
+    p.executor.run = AsyncMock(return_value=expected)
 
     result = await p.run_workflow("my_wf", {"message": "hello"})
 
     p.workflows.get.assert_called_once_with("my_wf")
-    p.runner.run.assert_awaited_once_with(fake_agent, {"message": "hello"}, p.sessions)
+    p.executor.build_runner.assert_called_once_with(fake_agent, fake_hw.definition.runtime)
+    p.executor.run.assert_awaited_once_with(fake_runner, message="hello")
     assert isinstance(result, RunResult)
     assert result.content == "done"
 
@@ -202,9 +201,7 @@ def test_agent_cards_delegates_to_generator() -> None:
 @pytest.mark.asyncio
 async def test_shutdown_cleans_up() -> None:
     p = _make_booted_platform()
-    p.sessions.cleanup = AsyncMock()
 
     await p.shutdown()
 
-    p.sessions.cleanup.assert_awaited_once()
     assert p.is_booted is False

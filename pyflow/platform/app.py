@@ -10,10 +10,9 @@ from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.a2a.cards import AgentCardGenerator
+from pyflow.platform.executor import WorkflowExecutor
 from pyflow.platform.registry.tool_registry import ToolRegistry
 from pyflow.platform.registry.workflow_registry import WorkflowRegistry
-from pyflow.platform.runner.engine import PlatformRunner
-from pyflow.platform.session.service import SessionManager
 
 logger = structlog.get_logger()
 
@@ -25,8 +24,7 @@ class PyFlowPlatform:
         self.config = config or PlatformConfig()
         self.tools = ToolRegistry()
         self.workflows = WorkflowRegistry()
-        self.sessions = SessionManager()
-        self.runner = PlatformRunner()
+        self.executor = WorkflowExecutor()
         self._a2a = AgentCardGenerator(
             base_url=f"http://{self.config.host}:{self.config.port}"
         )
@@ -49,10 +47,6 @@ class PyFlowPlatform:
         self.workflows.hydrate(self.tools)
         log.info("workflows.hydrated")
 
-        # 4. Initialize sessions
-        await self.sessions.initialize()
-        log.info("sessions.initialized")
-
         self._booted = True
         log.info("platform.ready")
 
@@ -66,11 +60,13 @@ class PyFlowPlatform:
         hw = self.workflows.get(name)
         if hw.agent is None:
             raise RuntimeError(f"Workflow '{name}' not hydrated.")
-        return await self.runner.run(hw.agent, input_data, self.sessions)
+        runtime = hw.definition.runtime
+        runner = self.executor.build_runner(hw.agent, runtime)
+        message = input_data.get("message", "")
+        return await self.executor.run(runner, message=message)
 
     async def shutdown(self) -> None:
         """Cleanup platform resources."""
-        await self.sessions.cleanup()
         self._booted = False
         logger.info("platform.shutdown")
 

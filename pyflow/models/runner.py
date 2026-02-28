@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class RunResult(BaseModel):
-    """Result from executing a workflow via PlatformRunner."""
+    """Result from executing a workflow via WorkflowExecutor."""
 
     content: str = ""
     author: str = ""
