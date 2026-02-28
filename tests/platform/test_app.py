@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from pyflow.models.a2a import AgentCard
 from pyflow.models.platform import PlatformConfig
+from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.app import PyFlowPlatform
@@ -132,13 +134,15 @@ async def test_run_workflow_delegates_to_runner() -> None:
     fake_hw.agent = fake_agent
 
     p.workflows.get = MagicMock(return_value=fake_hw)
-    p.runner.run = AsyncMock(return_value={"content": "done"})
+    expected = RunResult(content="done")
+    p.runner.run = AsyncMock(return_value=expected)
 
     result = await p.run_workflow("my_wf", {"message": "hello"})
 
     p.workflows.get.assert_called_once_with("my_wf")
     p.runner.run.assert_awaited_once_with(fake_agent, {"message": "hello"}, p.sessions)
-    assert result == {"content": "done"}
+    assert isinstance(result, RunResult)
+    assert result.content == "done"
 
 
 @pytest.mark.asyncio
@@ -179,13 +183,16 @@ def test_agent_cards_delegates_to_generator() -> None:
     p = _make_booted_platform()
 
     fake_workflows = [MagicMock(spec=WorkflowDef)]
+    fake_card = AgentCard(name="test", url="http://localhost:8000/a2a/test")
     p.workflows.list_workflows = MagicMock(return_value=fake_workflows)
-    p._a2a.generate_all = MagicMock(return_value=[{"name": "test"}])
+    p._a2a.generate_all = MagicMock(return_value=[fake_card])
 
     result = p.agent_cards()
 
     p._a2a.generate_all.assert_called_once_with(fake_workflows)
-    assert result == [{"name": "test"}]
+    assert len(result) == 1
+    assert isinstance(result[0], AgentCard)
+    assert result[0].name == "test"
 
 
 # ---------------------------------------------------------------------------

@@ -53,10 +53,9 @@ class TestPlatformIntegration:
         await platform.boot()
         cards = platform.agent_cards()
         assert len(cards) >= 1
-        card = next(c for c in cards if c["name"] == "exchange_tracker")
-        assert "skills" in card
-        assert len(card["skills"]) == 1
-        assert card["skills"][0]["id"] == "rate_tracking"
+        card = next(c for c in cards if c.name == "exchange_tracker")
+        assert len(card.skills) == 1
+        assert card.skills[0].id == "rate_tracking"
         await platform.shutdown()
 
     async def test_validate_example_workflow(self):

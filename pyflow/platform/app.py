@@ -4,7 +4,9 @@ from pathlib import Path
 
 import structlog
 
+from pyflow.models.a2a import AgentCard
 from pyflow.models.platform import PlatformConfig
+from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.a2a.cards import AgentCardGenerator
@@ -58,7 +60,7 @@ class PyFlowPlatform:
         if not self._booted:
             raise RuntimeError("Platform not booted. Call boot() first.")
 
-    async def run_workflow(self, name: str, input_data: dict) -> dict:
+    async def run_workflow(self, name: str, input_data: dict) -> RunResult:
         """Execute a workflow by name."""
         self._ensure_booted()
         hw = self.workflows.get(name)
@@ -80,7 +82,7 @@ class PyFlowPlatform:
         self._ensure_booted()
         return self.workflows.list_workflows()
 
-    def agent_cards(self) -> list[dict]:
+    def agent_cards(self) -> list[AgentCard]:
         """Auto-generate A2A agent cards from workflow registry."""
         self._ensure_booted()
         return self._a2a.generate_all(self.workflows.list_workflows())

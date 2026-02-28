@@ -5,6 +5,7 @@ from google.adk.runners import Runner
 from google.genai import types
 import structlog
 
+from pyflow.models.runner import RunResult
 from pyflow.platform.session.service import SessionManager
 
 logger = structlog.get_logger(__name__)
@@ -18,7 +19,7 @@ class PlatformRunner:
         agent: BaseAgent,
         input_data: dict,
         session_manager: SessionManager,
-    ) -> dict:
+    ) -> RunResult:
         """Run an agent with the given input and return the final response."""
         runner = Runner(
             agent=agent,
@@ -62,11 +63,11 @@ class PlatformRunner:
             if hasattr(final_response, "usage_metadata") and final_response.usage_metadata:
                 usage = final_response.usage_metadata
             logger.info("runner.completed", agent=agent.name, author=final_response.author)
-            return {
-                "content": text,
-                "author": final_response.author,
-                "usage_metadata": usage,
-            }
+            return RunResult(
+                content=text,
+                author=final_response.author,
+                usage_metadata=usage,
+            )
 
         logger.info("runner.completed_empty", agent=agent.name)
-        return {"content": "", "author": agent.name, "usage_metadata": None}
+        return RunResult(author=agent.name)

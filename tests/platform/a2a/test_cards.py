@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from pyflow.models.a2a import AgentCard, AgentCardSkill
 from pyflow.models.agent import AgentConfig
 from pyflow.models.workflow import A2AConfig, OrchestrationConfig, SkillDef, WorkflowDef
 from pyflow.platform.a2a.cards import AgentCardGenerator
@@ -32,11 +33,12 @@ class TestGenerateCardBasic:
         wf = _minimal_workflow()
         card = gen.generate_card(wf)
 
-        assert card["name"] == "test_wf"
-        assert card["description"] == "Description for test_wf"
-        assert card["version"] == "1.0.0"
-        assert card["protocolVersion"] == "0.2.6"
-        assert card["skills"] == []
+        assert isinstance(card, AgentCard)
+        assert card.name == "test_wf"
+        assert card.description == "Description for test_wf"
+        assert card.version == "1.0.0"
+        assert card.protocol_version == "0.2.6"
+        assert card.skills == []
 
     def test_generate_card_with_a2a_config(self) -> None:
         """Workflow with a2a.version and skills reflects them in the card."""
@@ -55,12 +57,12 @@ class TestGenerateCardBasic:
         wf = _minimal_workflow(a2a=a2a)
         card = gen.generate_card(wf)
 
-        assert card["version"] == "2.5.0"
-        assert len(card["skills"]) == 1
-        assert card["skills"][0]["id"] == "rate_tracking"
-        assert card["skills"][0]["name"] == "Exchange Rate Tracking"
-        assert card["skills"][0]["description"] == "Track exchange rates"
-        assert card["skills"][0]["tags"] == ["finance", "monitoring"]
+        assert card.version == "2.5.0"
+        assert len(card.skills) == 1
+        assert card.skills[0].id == "rate_tracking"
+        assert card.skills[0].name == "Exchange Rate Tracking"
+        assert card.skills[0].description == "Track exchange rates"
+        assert card.skills[0].tags == ["finance", "monitoring"]
 
 
 class TestCardUrl:
@@ -70,7 +72,7 @@ class TestCardUrl:
         wf = _minimal_workflow(name="my_workflow")
         card = gen.generate_card(wf)
 
-        assert card["url"] == "http://localhost:8000/a2a/my_workflow"
+        assert card.url == "http://localhost:8000/a2a/my_workflow"
 
     def test_generate_card_custom_base_url(self) -> None:
         """Custom base_url is reflected in the card URL."""
@@ -78,7 +80,7 @@ class TestCardUrl:
         wf = _minimal_workflow(name="wf1")
         card = gen.generate_card(wf)
 
-        assert card["url"] == "https://prod.example.com:9000/a2a/wf1"
+        assert card.url == "https://prod.example.com:9000/a2a/wf1"
 
     def test_generate_card_strips_trailing_slash(self) -> None:
         """Trailing slash on base_url does not cause double slash in URL."""
@@ -86,8 +88,8 @@ class TestCardUrl:
         wf = _minimal_workflow(name="wf2")
         card = gen.generate_card(wf)
 
-        assert card["url"] == "http://example.com/a2a/wf2"
-        assert "//" not in card["url"].split("://")[1]
+        assert card.url == "http://example.com/a2a/wf2"
+        assert "//" not in card.url.split("://")[1]
 
 
 class TestGenerateAll:
@@ -98,7 +100,7 @@ class TestGenerateAll:
         cards = gen.generate_all(workflows)
 
         assert len(cards) == 3
-        assert [c["name"] for c in cards] == ["wf_0", "wf_1", "wf_2"]
+        assert [c.name for c in cards] == ["wf_0", "wf_1", "wf_2"]
 
     def test_generate_all_empty_list(self) -> None:
         """Empty input yields empty output."""
@@ -112,18 +114,18 @@ class TestCardStructure:
         gen = AgentCardGenerator()
         card = gen.generate_card(_minimal_workflow())
 
-        required_fields = [
+        required_attrs = [
             "name",
             "url",
             "version",
-            "protocolVersion",
+            "protocol_version",
             "capabilities",
-            "defaultInputModes",
-            "defaultOutputModes",
+            "default_input_modes",
+            "default_output_modes",
             "skills",
         ]
-        for field in required_fields:
-            assert field in card, f"Missing required field: {field}"
+        for attr in required_attrs:
+            assert hasattr(card, attr), f"Missing required attribute: {attr}"
 
     def test_skills_structure(self) -> None:
         """Each skill entry has the required id, name, description, tags."""
@@ -136,10 +138,10 @@ class TestCardStructure:
         gen = AgentCardGenerator()
         card = gen.generate_card(_minimal_workflow(a2a=a2a))
 
-        assert len(card["skills"]) == 2
-        for skill in card["skills"]:
-            assert "id" in skill
-            assert "name" in skill
-            assert "description" in skill
-            assert "tags" in skill
-            assert isinstance(skill["tags"], list)
+        assert len(card.skills) == 2
+        for skill in card.skills:
+            assert isinstance(skill, AgentCardSkill)
+            assert skill.id
+            assert skill.name
+            assert skill.description
+            assert isinstance(skill.tags, list)

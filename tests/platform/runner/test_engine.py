@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from pyflow.models.runner import RunResult
 from pyflow.platform.runner.engine import PlatformRunner
 from pyflow.platform.session.service import SessionManager
 
@@ -62,8 +63,9 @@ class TestPlatformRunnerRun:
                 session_manager=session_manager,
             )
 
-        assert result["content"] == "Hello world"
-        assert result["author"] == "test-agent"
+        assert isinstance(result, RunResult)
+        assert result.content == "Hello world"
+        assert result.author == "test-agent"
 
     async def test_run_empty_response(self) -> None:
         runner = PlatformRunner()
@@ -99,8 +101,9 @@ class TestPlatformRunnerRun:
                 session_manager=session_manager,
             )
 
-        assert result["content"] == ""
-        assert result["author"] == "test-agent"
+        assert isinstance(result, RunResult)
+        assert result.content == ""
+        assert result.author == "test-agent"
 
     async def test_run_builds_user_message_from_input(self) -> None:
         runner = PlatformRunner()
@@ -215,7 +218,7 @@ class TestPlatformRunnerRun:
                 session_manager=session_manager,
             )
 
-        assert result["usage_metadata"] == {"prompt_tokens": 10, "completion_tokens": 20}
+        assert result.usage_metadata == {"prompt_tokens": 10, "completion_tokens": 20}
 
     async def test_run_empty_response_has_null_usage_metadata(self) -> None:
         runner = PlatformRunner()
@@ -244,7 +247,7 @@ class TestPlatformRunnerRun:
                 session_manager=session_manager,
             )
 
-        assert result["usage_metadata"] is None
+        assert result.usage_metadata is None
 
     async def test_run_propagates_runner_errors(self) -> None:
         runner = PlatformRunner()
