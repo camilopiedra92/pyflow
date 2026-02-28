@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-pyflow = "pyflow.cli:app"
+pyflow = "pyflow.cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

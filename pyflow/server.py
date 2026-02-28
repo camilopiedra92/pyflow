@@ -24,6 +24,9 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Boot platform on startup, shutdown on exit."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
     platform = PyFlowPlatform(PlatformConfig())
     await platform.boot()
     app.state.platform = platform
