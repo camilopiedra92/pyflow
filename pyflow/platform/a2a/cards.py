@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from pyflow.models.a2a import AgentCard
 from pyflow.models.workflow import SkillDef, WorkflowDef
 
@@ -27,3 +30,18 @@ class AgentCardGenerator:
     def generate_all(self, workflows: list[WorkflowDef]) -> list[AgentCard]:
         """Generate agent cards for all workflows."""
         return [self.generate_card(w) for w in workflows]
+
+    def load_card(self, package_dir: Path) -> AgentCard:
+        """Load an agent card from a package directory's agent-card.json."""
+        card_path = package_dir / "agent-card.json"
+        data = json.loads(card_path.read_text())
+        return AgentCard.model_validate(data)
+
+    def load_all(self, agents_dir: Path) -> list[AgentCard]:
+        """Load agent cards from all agent package subdirectories."""
+        cards = []
+        for package_dir in sorted(agents_dir.iterdir()):
+            card_path = package_dir / "agent-card.json"
+            if package_dir.is_dir() and card_path.exists():
+                cards.append(self.load_card(package_dir))
+        return cards
