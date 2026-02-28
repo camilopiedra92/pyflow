@@ -10,6 +10,23 @@ from pyflow.models.tool import ToolMetadata
 
 _TOOL_AUTO_REGISTRY: dict[str, type[BasePlatformTool]] = {}
 
+_PLATFORM_SECRETS: dict[str, str] = {}
+
+
+def set_secrets(secrets: dict[str, str]) -> None:
+    """Store secrets for platform tools."""
+    _PLATFORM_SECRETS.update(secrets)
+
+
+def get_secret(name: str) -> str | None:
+    """Retrieve a secret by name. Returns None if not found."""
+    return _PLATFORM_SECRETS.get(name)
+
+
+def clear_secrets() -> None:
+    """Clear all stored secrets. Used in tests."""
+    _PLATFORM_SECRETS.clear()
+
 
 class BasePlatformTool(ABC):
     """Base class for auto-registering platform tools.

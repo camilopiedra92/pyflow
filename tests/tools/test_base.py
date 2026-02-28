@@ -3,7 +3,14 @@ from __future__ import annotations
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
-from pyflow.tools.base import BasePlatformTool, get_registered_tools, _TOOL_AUTO_REGISTRY
+from pyflow.tools.base import (
+    BasePlatformTool,
+    get_registered_tools,
+    _TOOL_AUTO_REGISTRY,
+    get_secret,
+    set_secrets,
+    clear_secrets,
+)
 
 
 class _DummyTool(BasePlatformTool):
@@ -50,3 +57,29 @@ class TestMetadata:
         meta = _DummyTool.metadata()
         assert meta.name == "dummy"
         assert meta.description == "A dummy tool for testing"
+
+
+class TestSecretStore:
+    def setup_method(self):
+        clear_secrets()
+
+    def teardown_method(self):
+        clear_secrets()
+
+    def test_get_secret_returns_none_when_empty(self):
+        assert get_secret("nonexistent") is None
+
+    def test_set_and_get_secret(self):
+        set_secrets({"my_key": "my_value"})
+        assert get_secret("my_key") == "my_value"
+
+    def test_set_secrets_merges(self):
+        set_secrets({"a": "1"})
+        set_secrets({"b": "2"})
+        assert get_secret("a") == "1"
+        assert get_secret("b") == "2"
+
+    def test_clear_secrets_removes_all(self):
+        set_secrets({"a": "1"})
+        clear_secrets()
+        assert get_secret("a") is None
