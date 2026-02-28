@@ -577,15 +577,31 @@ echo 'PYFLOW_YNAB_API_TOKEN=your-token-here' >> .env
 
 ### ADK Built-in Tools
 
-These tools are provided by Google ADK and available by name in any workflow:
+These tools are provided by Google ADK and available by name in any workflow. They are lazy-imported and don't require extra installation.
+
+**Grounding tools** — Gemini 2 models invoke these automatically when listed in `tools:`:
+
+| Tool | Purpose |
+|------|---------|
+| `google_search` | Google Search — gives the LLM access to web search results |
+| `google_maps_grounding` | Google Maps — location-aware grounding for geographic queries |
+| `url_context` | URL content extraction — retrieves and uses content from URLs in the conversation |
+| `enterprise_web_search` | Enterprise-compliant web search grounding |
+
+**Memory & artifact tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `load_memory` | Load relevant memories for the current user (semantic search) |
+| `preload_memory` | Preload all memories at session start |
+| `load_artifacts` | Load artifacts (files, images) into the session |
+
+**Control & interactive tools:**
 
 | Tool | Purpose |
 |------|---------|
 | `exit_loop` | Signal loop completion from within a LoopAgent |
-| `google_search` | Google Search grounding — gives the LLM access to web search |
-| `load_memory` | Load relevant memories from the memory service |
-
-Built-in tools are lazy-imported and don't require extra installation.
+| `get_user_choice` | Async user interaction — pauses for user input (long-running) |
 
 ### Creating Custom Tools
 

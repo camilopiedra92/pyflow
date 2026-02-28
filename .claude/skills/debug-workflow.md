@@ -308,15 +308,24 @@ Error occurs
 ## Quick Reference: Available Tools
 
 ```
-http_request    — HTTP client with SSRF protection
-transform       — JSONPath data extraction
-condition       — Safe boolean expression evaluation
-alert           — Webhook notifications
-storage         — Local file read/write/append
-ynab            — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
-exit_loop       — ADK built-in: signal loop completion
-google_search   — ADK built-in: Google Search grounding
-load_memory     — ADK built-in: load from memory service
+Platform tools:
+  http_request           — HTTP client with SSRF protection
+  transform              — JSONPath data extraction
+  condition              — Safe boolean expression evaluation
+  alert                  — Webhook notifications
+  storage                — Local file read/write/append
+  ynab                   — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+
+ADK built-in tools:
+  exit_loop              — Signal loop completion
+  google_search          — Google Search grounding (Gemini auto-invokes)
+  google_maps_grounding  — Google Maps grounding (Gemini auto-invokes)
+  url_context            — Extract content from URLs (Gemini auto-invokes)
+  enterprise_web_search  — Enterprise-compliant web search
+  load_memory            — Load relevant memories for current user
+  preload_memory         — Preload all memories at session start
+  load_artifacts         — Load artifacts into session
+  get_user_choice        — Async user interaction (long-running)
 ```
 
 List custom tools: `pyflow list --tools`

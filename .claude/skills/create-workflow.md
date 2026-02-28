@@ -97,7 +97,21 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (`exit_loop`, `google_search`, `load_memory`), plus any custom tools in `pyflow/tools/`.
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (see below), plus any custom tools in `pyflow/tools/`.
+
+**ADK built-in tools** (available by name in `tools:` list):
+
+| Tool | Category | Description |
+|------|----------|-------------|
+| `exit_loop` | Control | Signal loop completion from within a LoopAgent |
+| `google_search` | Grounding | Google Search — Gemini invokes automatically |
+| `google_maps_grounding` | Grounding | Google Maps — location-aware grounding |
+| `url_context` | Grounding | Extract content from URLs in the conversation |
+| `enterprise_web_search` | Grounding | Enterprise-compliant web search |
+| `load_memory` | Memory | Load relevant memories for the current user |
+| `preload_memory` | Memory | Preload all memories at session start |
+| `load_artifacts` | Artifacts | Load artifacts into the session |
+| `get_user_choice` | Interactive | Async user interaction (long-running) |
 
 **`output_schema` reference** — enforces structured JSON output at the API level. The LLM can only produce JSON matching this schema:
 

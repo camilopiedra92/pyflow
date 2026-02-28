@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 476 tests
+- `pytest -v` — run all 482 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -81,7 +81,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `description` on LLM agents is used by `llm_routed` orchestration for agent routing
 - `include_contents: "none"` hides conversation history from an agent (isolated sub-tasks)
 - `agent_tools` wraps referenced agents as ADK `AgentTool` for agent-as-tool composition
-- Built-in tool catalog: `exit_loop`, `google_search`, `load_memory` (lazy-imported from ADK)
+- Built-in tool catalog (lazy-imported from ADK): `exit_loop`, `google_search`, `google_maps_grounding`, `enterprise_web_search`, `url_context`, `load_memory`, `preload_memory`, `load_artifacts`, `get_user_choice`
 - OrchestrationConfig supports `planner: builtin` with `planner_config: {thinking_budget: N}` for Gemini BuiltInPlanner
 - A2A agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot
 - Each agent package exports `root_agent` via `__init__.py` for ADK compatibility (`adk web`, `adk deploy`)
@@ -103,7 +103,7 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent`), `agent-
 
 ## Testing
 
-- 476 tests across 35 test files
+- 482 tests across 35 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
