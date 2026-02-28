@@ -1,3 +1,7 @@
+# Spec source: https://api.ynab.com/papi/open_api_spec.yaml (public, no auth)
+# Update: curl -sS https://api.ynab.com/papi/open_api_spec.yaml -o specs/ynab-v1-openapi.yaml
+# Python SDK: https://github.com/ynab/ynab-sdk-python
+
 name: budget_analyst
 description: "Personal budget analyst powered by YNAB — answers natural language questions about your finances"
 
