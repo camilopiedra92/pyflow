@@ -99,3 +99,30 @@ def test_resolve_tools_unknown_raises_keyerror(registry: ToolRegistry) -> None:
     """resolve_tools() should raise KeyError if any tool name is unknown."""
     with pytest.raises(KeyError, match="Unknown tool"):
         registry.resolve_tools(["does_not_exist"])
+
+
+# -- Built-in tool catalog tests ----------------------------------------------
+
+
+class TestBuiltinToolCatalog:
+    def test_resolve_exit_loop(self) -> None:
+        """exit_loop ADK built-in should be resolvable via resolve_tools."""
+        registry = ToolRegistry()
+        registry.discover()
+        tools = registry.resolve_tools(["exit_loop"])
+        assert len(tools) == 1
+
+    def test_custom_takes_priority_over_builtin(self) -> None:
+        """Custom tools should resolve normally and take priority over built-in."""
+        registry = ToolRegistry()
+        registry.discover()
+        # http_request is custom, should resolve normally
+        tool = registry.get_function_tool("http_request")
+        assert tool is not None
+
+    def test_unknown_tool_raises(self) -> None:
+        """get_function_tool() should raise KeyError for unknown tool name."""
+        registry = ToolRegistry()
+        registry.discover()
+        with pytest.raises(KeyError):
+            registry.get_function_tool("nonexistent_tool")

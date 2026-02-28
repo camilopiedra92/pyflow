@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from google.adk.tools import FunctionTool
+from google.adk.tools.exit_loop_tool import exit_loop
+
 from pyflow.models.tool import ToolMetadata
 from pyflow.tools.base import BasePlatformTool
+
+# ADK built-in tools available by name in workflow YAML
+_ADK_BUILTIN_TOOLS: dict[str, Callable[[], FunctionTool]] = {
+    "exit_loop": lambda: FunctionTool(func=exit_loop),
+}
 
 
 class ToolRegistry:
@@ -28,9 +38,16 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
         return self._tools[name]()
 
-    def get_function_tool(self, name: str):
-        """Get an ADK FunctionTool by tool name."""
-        return self.get(name).as_function_tool()
+    def get_function_tool(self, name: str) -> FunctionTool:
+        """Get an ADK FunctionTool by tool name.
+
+        Custom tools take priority over ADK built-in tools.
+        """
+        if name in self._tools:
+            return self._tools[name]().as_function_tool()
+        if name in _ADK_BUILTIN_TOOLS:
+            return _ADK_BUILTIN_TOOLS[name]()
+        raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
 
     def resolve_tools(self, names: list[str]) -> list:
         """Batch resolve tool names to ADK FunctionTools."""
