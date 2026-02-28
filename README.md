@@ -42,7 +42,7 @@ description: "Track USD/MXN exchange rate and alert on thresholds"
 agents:
   - name: fetcher
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Fetch the current USD/MXN rate using http_request"
     tools:
       - http_request
@@ -50,7 +50,7 @@ agents:
 
   - name: analyzer
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Analyze the rate from {rate_data}. Alert if above 20."
     tools:
       - condition
@@ -80,7 +80,7 @@ Use Gemini models natively, or prefix with `anthropic/` or `openai/` for LiteLLM
 agents:
   - name: classifier
     type: llm
-    model: gemini-2.0-flash          # Google Gemini (native)
+    model: gemini-2.5-flash          # Google Gemini (native)
     instruction: "Classify this input"
 
   - name: writer

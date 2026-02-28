@@ -66,7 +66,7 @@ class TestWorkflowDef:
             AgentConfig(
                 name="fetcher",
                 type="llm",
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 instruction="Fetch data",
                 tools=["http_request"],
             ),

@@ -12,7 +12,7 @@ from pyflow.platform.registry.tool_registry import ToolRegistry
 
 def _make_llm_agent_config(
     name: str = "agent1",
-    model: str = "gemini-2.0-flash",
+    model: str = "gemini-2.5-flash",
     instruction: str = "Do something",
     tools: list[str] | None = None,
     output_key: str | None = None,
@@ -187,16 +187,16 @@ class TestHydrateLiteLlmForOpenAIModel:
 
 class TestHydrateGeminiModelDirect:
     def test_gemini_model_passed_as_string(self, mock_tool_registry):
-        """Model 'gemini-2.0-flash' -> passed as string directly."""
+        """Model 'gemini-2.5-flash' -> passed as string directly."""
         agents = [
-            _make_llm_agent_config(name="gemini_agent", model="gemini-2.0-flash"),
+            _make_llm_agent_config(name="gemini_agent", model="gemini-2.5-flash"),
         ]
         workflow = _make_workflow(agents=agents)
         hydrator = WorkflowHydrator(mock_tool_registry)
         root = hydrator.hydrate(workflow)
 
         llm_agent = root.sub_agents[0]
-        assert llm_agent.model == "gemini-2.0-flash"
+        assert llm_agent.model == "gemini-2.5-flash"
 
 
 class TestHydrateAgentWithOutputKey:

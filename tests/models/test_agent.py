@@ -11,14 +11,14 @@ class TestAgentConfigLlm:
         agent = AgentConfig(
             name="fetcher",
             type="llm",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             instruction="Fetch exchange rates",
             tools=["http_request"],
             output_key="rate_data",
         )
         assert agent.name == "fetcher"
         assert agent.type == "llm"
-        assert agent.model == "gemini-2.0-flash"
+        assert agent.model == "gemini-2.5-flash"
         assert agent.instruction == "Fetch exchange rates"
         assert agent.tools == ["http_request"]
         assert agent.output_key == "rate_data"
@@ -36,14 +36,14 @@ class TestAgentConfigLlm:
             AgentConfig(
                 name="bad",
                 type="llm",
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
             )
 
     def test_llm_agent_defaults(self):
         agent = AgentConfig(
             name="minimal",
             type="llm",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             instruction="Do something",
         )
         assert agent.tools == []

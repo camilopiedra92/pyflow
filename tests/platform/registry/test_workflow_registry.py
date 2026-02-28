@@ -17,7 +17,7 @@ description: A test workflow
 agents:
   - name: fetcher
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: Fetch data
     tools: [http_request]
     output_key: data
@@ -86,7 +86,7 @@ def test_register_workflow(registry: WorkflowRegistry) -> None:
             {
                 "name": "agent1",
                 "type": "llm",
-                "model": "gemini-2.0-flash",
+                "model": "gemini-2.5-flash",
                 "instruction": "Do something",
             }
         ],
@@ -105,7 +105,7 @@ def test_get_returns_hydrated_workflow(registry: WorkflowRegistry) -> None:
             {
                 "name": "a",
                 "type": "llm",
-                "model": "gemini-2.0-flash",
+                "model": "gemini-2.5-flash",
                 "instruction": "test",
             }
         ],

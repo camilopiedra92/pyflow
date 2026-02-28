@@ -18,7 +18,7 @@ def _make_workflow(name: str = "test-wf", description: str = "A test workflow") 
             {
                 "name": "agent1",
                 "type": "llm",
-                "model": "gemini-2.0-flash",
+                "model": "gemini-2.5-flash",
                 "instruction": "Do something",
             }
         ],

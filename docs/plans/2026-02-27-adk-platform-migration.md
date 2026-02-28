@@ -134,7 +134,7 @@ description: "Track exchange rates and alert on thresholds"
 agents:
   - name: fetcher
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Fetch the current USD/MXN exchange rate"
     tools: [http_request]
     output_key: rate_data

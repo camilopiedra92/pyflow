@@ -16,7 +16,7 @@ def _minimal_workflow(name: str = "test_wf", *, a2a: A2AConfig | None = None) ->
             AgentConfig(
                 name="agent1",
                 type="llm",
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 instruction="Do something",
             ),
         ],
