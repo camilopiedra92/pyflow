@@ -11,6 +11,7 @@ from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.app import PyFlowPlatform
+from pyflow.tools.base import get_secret, clear_secrets
 
 
 # ---------------------------------------------------------------------------
@@ -211,3 +212,39 @@ async def test_shutdown_cleans_up() -> None:
     await p.shutdown()
 
     assert p.is_booted is False
+
+
+# ---------------------------------------------------------------------------
+# Boot injects secrets
+# ---------------------------------------------------------------------------
+
+
+class TestBootInjectsSecrets:
+    def setup_method(self):
+        clear_secrets()
+
+    def teardown_method(self):
+        clear_secrets()
+
+    @pytest.mark.asyncio
+    async def test_boot_calls_set_secrets(self):
+        config = PlatformConfig(secrets={"ynab_api_token": "test-token"})
+        p = PyFlowPlatform(config=config)
+        p.tools.discover = MagicMock()
+        p.workflows.discover = MagicMock()
+        p.workflows.hydrate = MagicMock()
+
+        await p.boot()
+
+        assert get_secret("ynab_api_token") == "test-token"
+
+    @pytest.mark.asyncio
+    async def test_boot_without_secrets_is_fine(self):
+        p = PyFlowPlatform()
+        p.tools.discover = MagicMock()
+        p.workflows.discover = MagicMock()
+        p.workflows.hydrate = MagicMock()
+
+        await p.boot()
+
+        assert get_secret("nonexistent") is None

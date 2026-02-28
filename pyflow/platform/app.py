@@ -13,6 +13,7 @@ from pyflow.platform.a2a.cards import AgentCardGenerator
 from pyflow.platform.executor import WorkflowExecutor
 from pyflow.platform.registry.tool_registry import ToolRegistry
 from pyflow.platform.registry.workflow_registry import WorkflowRegistry
+from pyflow.tools.base import set_secrets
 
 logger = structlog.get_logger()
 
@@ -31,6 +32,11 @@ class PyFlowPlatform:
     async def boot(self) -> None:
         """Platform lifecycle: discover -> validate -> hydrate -> ready."""
         log = logger.bind(phase="boot")
+
+        # 0. Inject secrets for platform tools
+        if self.config.secrets:
+            set_secrets(self.config.secrets)
+            log.info("secrets.loaded", count=len(self.config.secrets))
 
         # 1. Discover tools
         self.tools.discover()
