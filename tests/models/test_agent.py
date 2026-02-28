@@ -110,9 +110,7 @@ class TestAgentConfigCallbacks:
         assert config.callbacks == {"before_agent": "log_start", "after_agent": "log_output"}
 
     def test_callbacks_default_none(self):
-        config = AgentConfig(
-            name="test", type="llm", model="gemini-2.5-flash", instruction="test"
-        )
+        config = AgentConfig(name="test", type="llm", model="gemini-2.5-flash", instruction="test")
         assert config.callbacks is None
 
 

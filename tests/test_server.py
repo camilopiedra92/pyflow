@@ -122,7 +122,9 @@ class TestWorkflows:
         assert data["result"]["content"] == "done"
         assert data["result"]["author"] == "test-agent"
         client._mock_platform.run_workflow.assert_awaited_once_with(
-            "test", {"message": "hello", "data": {}}, user_id="default",
+            "test",
+            {"message": "hello", "data": {}},
+            user_id="default",
         )
 
     async def test_run_workflow_with_user_id(self, client: AsyncClient):
@@ -135,7 +137,9 @@ class TestWorkflows:
         )
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
-            "test", {"message": "hello", "data": {}}, user_id="alice",
+            "test",
+            {"message": "hello", "data": {}},
+            user_id="alice",
         )
 
     async def test_run_workflow_user_id_default(self, client: AsyncClient):
@@ -149,7 +153,9 @@ class TestWorkflows:
         )
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
-            "test", {"message": "hi", "data": {}}, user_id="default",
+            "test",
+            {"message": "hi", "data": {}},
+            user_id="default",
         )
 
     async def test_run_workflow_not_found(self, client: AsyncClient):
@@ -202,7 +208,9 @@ class TestA2A:
         assert data["result"]["content"] == "a2a result"
         assert data["result"]["author"] == "a2a-agent"
         client._mock_platform.run_workflow.assert_awaited_once_with(
-            "test-wf", {"message": "run it", "data": {}}, user_id="default",
+            "test-wf",
+            {"message": "run it", "data": {}},
+            user_id="default",
         )
 
     async def test_a2a_execute_with_user_id(self, client: AsyncClient):
@@ -215,7 +223,9 @@ class TestA2A:
         )
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
-            "test-wf", {"message": "run it", "data": {}}, user_id="bob",
+            "test-wf",
+            {"message": "run it", "data": {}},
+            user_id="bob",
         )
 
     async def test_a2a_execute_not_found(self, client: AsyncClient):

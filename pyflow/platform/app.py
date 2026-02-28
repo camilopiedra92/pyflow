@@ -25,9 +25,7 @@ class PyFlowPlatform:
         self.tools = ToolRegistry()
         self.workflows = WorkflowRegistry()
         self.executor = WorkflowExecutor()
-        self._a2a = AgentCardGenerator(
-            base_url=f"http://{self.config.host}:{self.config.port}"
-        )
+        self._a2a = AgentCardGenerator(base_url=f"http://{self.config.host}:{self.config.port}")
         self._booted = False
 
     async def boot(self) -> None:
@@ -55,7 +53,10 @@ class PyFlowPlatform:
             raise RuntimeError("Platform not booted. Call boot() first.")
 
     async def run_workflow(
-        self, name: str, input_data: dict, user_id: str = "default",
+        self,
+        name: str,
+        input_data: dict,
+        user_id: str = "default",
     ) -> RunResult:
         """Execute a workflow by name."""
         self._ensure_booted()

@@ -92,9 +92,7 @@ class WorkflowHydrator:
 
         return LlmAgent(**kwargs)
 
-    def _build_workflow_agent(
-        self, config: AgentConfig, agents: dict[str, BaseAgent]
-    ) -> BaseAgent:
+    def _build_workflow_agent(self, config: AgentConfig, agents: dict[str, BaseAgent]) -> BaseAgent:
         """Build a workflow agent (sequential/parallel/loop) from AgentConfig."""
         sub = [agents[name] for name in (config.sub_agents or [])]
 

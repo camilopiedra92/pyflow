@@ -46,9 +46,7 @@ class WorkflowRegistry:
     def get(self, name: str) -> HydratedWorkflow:
         """Get a hydrated workflow by name. Raises KeyError if not found."""
         if name not in self._workflows:
-            raise KeyError(
-                f"Unknown workflow: '{name}'. Available: {list(self._workflows.keys())}"
-            )
+            raise KeyError(f"Unknown workflow: '{name}'. Available: {list(self._workflows.keys())}")
         return self._workflows[name]
 
     def list_workflows(self) -> list[WorkflowDef]:

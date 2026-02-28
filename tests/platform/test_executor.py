@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from pyflow.models.runner import RunResult
 from pyflow.models.workflow import RuntimeConfig
@@ -15,7 +14,7 @@ class TestBuildRunner:
         agent = MagicMock()
         runtime = RuntimeConfig()
         with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
-            with patch("pyflow.platform.executor.InMemorySessionService") as mock_svc:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
                 executor.build_runner(agent, runtime)
                 mock_runner_cls.assert_called_once()
                 # session_service should be InMemorySessionService
@@ -108,7 +107,7 @@ class TestRun:
 
         mock_runner.run_async = fake_run
 
-        result = await executor.run(mock_runner, message="hi")
+        await executor.run(mock_runner, message="hi")
         # user_id defaults to "default"
         mock_runner.session_service.create_session.assert_called_once()
         call_kwargs = mock_runner.session_service.create_session.call_args[1]

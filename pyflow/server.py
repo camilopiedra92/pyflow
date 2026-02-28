@@ -75,7 +75,9 @@ async def run_workflow(name: str, input_data: WorkflowInput):
     platform = _get_platform()
     try:
         result = await platform.run_workflow(
-            name, input_data.model_dump(exclude={"user_id"}), user_id=input_data.user_id,
+            name,
+            input_data.model_dump(exclude={"user_id"}),
+            user_id=input_data.user_id,
         )
         return WorkflowRunResponse(result=result)
     except KeyError:
@@ -102,7 +104,9 @@ async def stream_workflow(name: str, input_data: WorkflowInput):
 
     async def _event_stream():
         async for event in platform.executor.run_streaming(
-            runner, user_id=input_data.user_id, message=input_data.message,
+            runner,
+            user_id=input_data.user_id,
+            message=input_data.message,
         ):
             payload = {
                 "author": getattr(event, "author", ""),
@@ -137,9 +141,7 @@ async def a2a_execute(workflow_name: str, input_data: WorkflowInput):
         )
         return WorkflowRunResponse(result=result)
     except KeyError:
-        raise HTTPException(
-            status_code=404, detail=f"Workflow '{workflow_name}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Workflow '{workflow_name}' not found")
     except Exception as e:
         logger.error("a2a.error", workflow=workflow_name, error=str(e))
         raise HTTPException(status_code=500, detail="Internal error")

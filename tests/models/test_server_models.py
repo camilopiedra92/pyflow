@@ -54,9 +54,7 @@ class TestToolListResponse:
             ToolListResponse()
 
     def test_serialization(self):
-        resp = ToolListResponse(
-            tools=[ToolMetadata(name="t1", description="Tool 1")]
-        )
+        resp = ToolListResponse(tools=[ToolMetadata(name="t1", description="Tool 1")])
         data = resp.model_dump()
         assert data["tools"][0]["name"] == "t1"
 

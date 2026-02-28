@@ -1,7 +1,7 @@
 """Integration tests — validate full platform boot and workflow hydration."""
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
 import yaml

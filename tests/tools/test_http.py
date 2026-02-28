@@ -4,7 +4,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 
 from pyflow.tools.http import HttpTool
 

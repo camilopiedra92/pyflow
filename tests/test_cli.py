@@ -1,11 +1,10 @@
 """Tests for the rewritten Typer CLI (ADK platform commands)."""
+
 from __future__ import annotations
 
 import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from pyflow.cli import app
@@ -38,30 +37,22 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert '"output": "done"' in result.stdout
         mock_platform.boot.assert_awaited_once()
-        mock_platform.run_workflow.assert_awaited_once_with(
-            "my_workflow", {}, user_id="default"
-        )
+        mock_platform.run_workflow.assert_awaited_once_with("my_workflow", {}, user_id="default")
         mock_platform.shutdown.assert_awaited_once()
 
     def test_run_with_user_id(self):
         mock_platform = _make_mock_platform(run_result={"output": "done"})
         with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
-            result = runner.invoke(
-                app, ["run", "my_workflow", "--user-id", "alice"]
-            )
+            result = runner.invoke(app, ["run", "my_workflow", "--user-id", "alice"])
         assert result.exit_code == 0
-        mock_platform.run_workflow.assert_awaited_once_with(
-            "my_workflow", {}, user_id="alice"
-        )
+        mock_platform.run_workflow.assert_awaited_once_with("my_workflow", {}, user_id="alice")
 
     def test_run_with_user_id_short_flag(self):
         mock_platform = _make_mock_platform(run_result={"output": "done"})
         with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
             result = runner.invoke(app, ["run", "my_workflow", "-u", "bob"])
         assert result.exit_code == 0
-        mock_platform.run_workflow.assert_awaited_once_with(
-            "my_workflow", {}, user_id="bob"
-        )
+        mock_platform.run_workflow.assert_awaited_once_with("my_workflow", {}, user_id="bob")
 
     def test_run_with_user_id_and_input(self):
         mock_platform = _make_mock_platform(run_result={"output": "done"})
@@ -141,11 +132,7 @@ class TestListCommand:
         wf = WorkflowDef(
             name="my_workflow",
             description="Test workflow",
-            agents=[
-                AgentConfig(
-                    name="a1", type="llm", model="gpt-4", instruction="Do things"
-                )
-            ],
+            agents=[AgentConfig(name="a1", type="llm", model="gpt-4", instruction="Do things")],
             orchestration=OrchestrationConfig(type="sequential", agents=["a1"]),
         )
         mock_platform = _make_mock_platform(workflows=[wf])

@@ -35,27 +35,19 @@ class TestStorageToolExecute:
         filepath = str(tmp_path / "append.txt")
 
         # Write initial
-        await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="write", data="line1\n"
-        )
+        await tool.execute(tool_context=MagicMock(), path=filepath, action="write", data="line1\n")
         # Append
-        await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="append", data="line2\n"
-        )
+        await tool.execute(tool_context=MagicMock(), path=filepath, action="append", data="line2\n")
 
         # Read
-        result = await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="read"
-        )
+        result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
         assert result["content"] == "line1\nline2\n"
 
     async def test_read_nonexistent_file(self, tmp_path):
         tool = StorageTool()
         filepath = str(tmp_path / "nonexistent.txt")
 
-        result = await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="read"
-        )
+        result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
         assert result["success"] is False
         assert result["content"] is None
         assert result["error"] == "File not found"
@@ -69,9 +61,7 @@ class TestStorageToolExecute:
         )
         assert result["success"] is True
 
-        read_result = await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="read"
-        )
+        read_result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
         assert read_result["content"] == "nested"
 
     async def test_dict_data_as_json_string(self, tmp_path):
@@ -84,9 +74,7 @@ class TestStorageToolExecute:
         )
         assert result["success"] is True
 
-        read_result = await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="read"
-        )
+        read_result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
         assert read_result["success"] is True
         parsed = json.loads(read_result["content"])
         assert parsed == {"key": "value"}
@@ -95,9 +83,7 @@ class TestStorageToolExecute:
         tool = StorageTool()
         filepath = str(tmp_path / "test.txt")
 
-        result = await tool.execute(
-            tool_context=MagicMock(), path=filepath, action="delete"
-        )
+        result = await tool.execute(tool_context=MagicMock(), path=filepath, action="delete")
         assert result["success"] is False
         assert "Unknown action" in result["error"]
 

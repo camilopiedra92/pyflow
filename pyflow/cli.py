@@ -70,9 +70,7 @@ def validate(
 def list_cmd(
     tools: bool = typer.Option(False, "--tools", "-t", help="List platform tools"),
     workflows: bool = typer.Option(False, "--workflows", "-w", help="List workflows"),
-    workflows_dir: str = typer.Option(
-        "workflows", "--workflows-dir", help="Workflows directory"
-    ),
+    workflows_dir: str = typer.Option("workflows", "--workflows-dir", help="Workflows directory"),
 ) -> None:
     """List registered tools or discovered workflows."""
     config = PlatformConfig(workflows_dir=workflows_dir)

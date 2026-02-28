@@ -28,6 +28,7 @@ class TransformTool(BasePlatformTool):
 
         try:
             from jsonpath_ng import parse as jp_parse
+
             matches = jp_parse(expression).find(parsed)
         except Exception as exc:
             return {"result": None, "error": f"JSONPath error: {exc}"}

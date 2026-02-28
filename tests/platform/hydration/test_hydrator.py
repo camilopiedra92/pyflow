@@ -148,16 +148,12 @@ class TestHydrateLiteLlmForAnthropicModel:
         from google.adk.models.base_llm import BaseLlm
 
         agents = [
-            _make_llm_agent_config(
-                name="claude_agent", model="anthropic/claude-sonnet-4-20250514"
-            ),
+            _make_llm_agent_config(name="claude_agent", model="anthropic/claude-sonnet-4-20250514"),
         ]
         workflow = _make_workflow(agents=agents)
         hydrator = WorkflowHydrator(mock_tool_registry)
 
-        with patch(
-            "pyflow.platform.hydration.hydrator._get_litellm"
-        ) as mock_get_litellm:
+        with patch("pyflow.platform.hydration.hydrator._get_litellm") as mock_get_litellm:
             mock_litellm_cls = MagicMock()
             mock_model_instance = MagicMock(spec=BaseLlm)
             mock_litellm_cls.return_value = mock_model_instance
@@ -181,9 +177,7 @@ class TestHydrateLiteLlmForOpenAIModel:
         workflow = _make_workflow(agents=agents)
         hydrator = WorkflowHydrator(mock_tool_registry)
 
-        with patch(
-            "pyflow.platform.hydration.hydrator._get_litellm"
-        ) as mock_get_litellm:
+        with patch("pyflow.platform.hydration.hydrator._get_litellm") as mock_get_litellm:
             mock_litellm_cls = MagicMock()
             mock_model_instance = MagicMock(spec=BaseLlm)
             mock_litellm_cls.return_value = mock_model_instance
@@ -254,9 +248,7 @@ class TestHydrateReactOrchestration:
         workflow = _make_workflow(agents=agents, orchestration=orch)
         hydrator = WorkflowHydrator(mock_tool_registry)
 
-        with patch(
-            "pyflow.platform.hydration.hydrator.PlanReActPlanner"
-        ) as MockPlanner:
+        with patch("pyflow.platform.hydration.hydrator.PlanReActPlanner") as MockPlanner:
             mock_planner_instance = MagicMock()
             MockPlanner.return_value = mock_planner_instance
 

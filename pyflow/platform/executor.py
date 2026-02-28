@@ -39,15 +39,19 @@ class WorkflowExecutor:
         """Execute a workflow and collect results."""
         if session_id:
             session = await runner.session_service.get_session(
-                app_name=self._app_name, user_id=user_id, session_id=session_id,
+                app_name=self._app_name,
+                user_id=user_id,
+                session_id=session_id,
             )
             if session is None:
                 session = await runner.session_service.create_session(
-                    app_name=self._app_name, user_id=user_id,
+                    app_name=self._app_name,
+                    user_id=user_id,
                 )
         else:
             session = await runner.session_service.create_session(
-                app_name=self._app_name, user_id=user_id,
+                app_name=self._app_name,
+                user_id=user_id,
             )
 
         content = types.Content(
@@ -92,7 +96,8 @@ class WorkflowExecutor:
     ) -> AsyncGenerator:
         """Yield events as they arrive for streaming APIs."""
         session = await runner.session_service.create_session(
-            app_name=self._app_name, user_id=user_id,
+            app_name=self._app_name,
+            user_id=user_id,
         )
         content = types.Content(
             role="user",
@@ -113,17 +118,20 @@ class WorkflowExecutor:
             case "sqlite":
                 url = runtime.session_db_url or "sqlite+aiosqlite:///pyflow_sessions.db"
                 from google.adk.sessions.database_session_service import DatabaseSessionService
+
                 return DatabaseSessionService(db_url=url)
             case "database":
                 if not runtime.session_db_url:
                     raise ValueError("database session_service requires session_db_url")
                 from google.adk.sessions.database_session_service import DatabaseSessionService
+
                 return DatabaseSessionService(db_url=runtime.session_db_url)
 
     def _build_memory_service(self, runtime: RuntimeConfig):
         match runtime.memory_service:
             case "in_memory":
                 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+
                 return InMemoryMemoryService()
             case "none":
                 return None
@@ -132,9 +140,11 @@ class WorkflowExecutor:
         match runtime.artifact_service:
             case "in_memory":
                 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+
                 return InMemoryArtifactService()
             case "file":
                 from google.adk.artifacts.file_artifact_service import FileArtifactService
+
                 return FileArtifactService(root_dir=runtime.artifact_dir or "./artifacts")
             case "none":
                 return None

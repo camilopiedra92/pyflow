@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 
 from pyflow.models.runner import RunResult
 

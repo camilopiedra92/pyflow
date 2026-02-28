@@ -140,9 +140,7 @@ class TestWorkflowDef:
             name="exchange_tracker",
             description="Track exchange rates",
             agents=agents,
-            orchestration=OrchestrationConfig(
-                type="sequential", agents=["fetcher", "analyzer"]
-            ),
+            orchestration=OrchestrationConfig(type="sequential", agents=["fetcher", "analyzer"]),
         )
         assert wf.name == "exchange_tracker"
         assert wf.description == "Track exchange rates"
@@ -154,12 +152,8 @@ class TestWorkflowDef:
         wf = WorkflowDef(
             name="exchange_tracker",
             agents=agents,
-            orchestration=OrchestrationConfig(
-                type="sequential", agents=["fetcher", "analyzer"]
-            ),
-            a2a=A2AConfig(
-                skills=[SkillDef(id="rate", name="Rate Tracking")]
-            ),
+            orchestration=OrchestrationConfig(type="sequential", agents=["fetcher", "analyzer"]),
+            a2a=A2AConfig(skills=[SkillDef(id="rate", name="Rate Tracking")]),
         )
         assert wf.a2a is not None
         assert len(wf.a2a.skills) == 1
@@ -180,9 +174,7 @@ class TestWorkflowDef:
         wf = WorkflowDef(
             name="minimal",
             agents=agents,
-            orchestration=OrchestrationConfig(
-                type="sequential", agents=["fetcher", "analyzer"]
-            ),
+            orchestration=OrchestrationConfig(type="sequential", agents=["fetcher", "analyzer"]),
         )
         assert wf.description == ""
 
@@ -192,9 +184,7 @@ class TestWorkflowDef:
         wf = WorkflowDef(
             name="with_default_runtime",
             agents=agents,
-            orchestration=OrchestrationConfig(
-                type="sequential", agents=["fetcher", "analyzer"]
-            ),
+            orchestration=OrchestrationConfig(type="sequential", agents=["fetcher", "analyzer"]),
         )
         assert wf.runtime is not None
         assert wf.runtime.session_service == "in_memory"
@@ -206,9 +196,7 @@ class TestWorkflowDef:
         wf = WorkflowDef(
             name="custom_runtime",
             agents=agents,
-            orchestration=OrchestrationConfig(
-                type="sequential", agents=["fetcher", "analyzer"]
-            ),
+            orchestration=OrchestrationConfig(type="sequential", agents=["fetcher", "analyzer"]),
             runtime=RuntimeConfig(
                 session_service="sqlite",
                 session_db_url="sqlite+aiosqlite:///wf.db",
@@ -398,9 +386,7 @@ class TestOrchestrationConfigExpanded:
         assert len(config.nodes) == 4
 
     def test_llm_routed(self):
-        config = OrchestrationConfig(
-            type="llm_routed", router="dispatcher", agents=["a", "b"]
-        )
+        config = OrchestrationConfig(type="llm_routed", router="dispatcher", agents=["a", "b"])
         assert config.type == "llm_routed"
         assert config.router == "dispatcher"
 

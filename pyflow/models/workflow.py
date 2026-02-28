@@ -118,9 +118,7 @@ class OrchestrationConfig(BaseModel):
                     queue.append(neighbor)
 
         if visited_count != len(node_names):
-            raise ValueError(
-                "DAG contains a cycle. All nodes must form a directed acyclic graph."
-            )
+            raise ValueError("DAG contains a cycle. All nodes must form a directed acyclic graph.")
 
 
 class WorkflowDef(BaseModel):

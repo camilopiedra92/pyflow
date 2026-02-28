@@ -10,10 +10,7 @@ from pyflow.tools.security import is_private_url
 
 class HttpTool(BasePlatformTool):
     name = "http_request"
-    description = (
-        "Make HTTP requests to external APIs. "
-        "Pass headers and body as JSON strings."
-    )
+    description = "Make HTTP requests to external APIs. Pass headers and body as JSON strings."
 
     async def execute(
         self,

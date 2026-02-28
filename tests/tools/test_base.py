@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
@@ -31,6 +30,7 @@ class TestGetRegisteredTools:
 
     def test_includes_builtin_tools(self):
         import pyflow.tools  # noqa: F401
+
         tools = get_registered_tools()
         assert "http_request" in tools
         assert "transform" in tools

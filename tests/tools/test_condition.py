@@ -31,16 +31,12 @@ class TestConditionToolExecute:
 
     async def test_comparison_with_and(self):
         tool = ConditionTool()
-        result = await tool.execute(
-            tool_context=MagicMock(), expression="100 >= 50 and 10 < 20"
-        )
+        result = await tool.execute(tool_context=MagicMock(), expression="100 >= 50 and 10 < 20")
         assert result["result"] is True
 
     async def test_string_comparison(self):
         tool = ConditionTool()
-        result = await tool.execute(
-            tool_context=MagicMock(), expression="'hello' == 'hello'"
-        )
+        result = await tool.execute(tool_context=MagicMock(), expression="'hello' == 'hello'")
         assert result["result"] is True
 
     async def test_bool_literal(self):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,6 +16,7 @@ from pyflow.platform.app import PyFlowPlatform
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def platform() -> PyFlowPlatform:
@@ -37,6 +38,7 @@ def custom_config() -> PlatformConfig:
 # Init tests
 # ---------------------------------------------------------------------------
 
+
 def test_init_defaults(platform: PyFlowPlatform) -> None:
     assert platform.config == PlatformConfig()
     assert platform.tools is not None
@@ -56,6 +58,7 @@ def test_init_custom_config(custom_config: PlatformConfig) -> None:
 # ---------------------------------------------------------------------------
 # Boot lifecycle
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_boot_lifecycle() -> None:
@@ -89,6 +92,7 @@ async def test_boot_sets_booted_flag() -> None:
 # Before-boot guard tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_run_workflow_before_boot_raises(platform: PyFlowPlatform) -> None:
     with pytest.raises(RuntimeError, match="not booted"):
@@ -113,6 +117,7 @@ def test_agent_cards_before_boot_raises(platform: PyFlowPlatform) -> None:
 # ---------------------------------------------------------------------------
 # Delegation tests (after boot)
 # ---------------------------------------------------------------------------
+
 
 def _make_booted_platform() -> PyFlowPlatform:
     """Create a platform with mocked sub-components that's marked as booted."""
@@ -197,6 +202,7 @@ def test_agent_cards_delegates_to_generator() -> None:
 # ---------------------------------------------------------------------------
 # Shutdown
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_shutdown_cleans_up() -> None:

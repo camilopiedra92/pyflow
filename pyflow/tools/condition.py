@@ -7,27 +7,66 @@ from google.adk.tools.tool_context import ToolContext
 from pyflow.tools.base import BasePlatformTool
 
 # Names that are forbidden in condition expressions
-_FORBIDDEN_NAMES = frozenset({
-    "__import__", "compile", "delattr", "getattr", "globals",
-    "locals", "setattr", "vars", "breakpoint", "input",
-    "memoryview", "type", "__builtins__", "__loader__", "__spec__",
-})
+_FORBIDDEN_NAMES = frozenset(
+    {
+        "__import__",
+        "compile",
+        "delattr",
+        "getattr",
+        "globals",
+        "locals",
+        "setattr",
+        "vars",
+        "breakpoint",
+        "input",
+        "memoryview",
+        "type",
+        "__builtins__",
+        "__loader__",
+        "__spec__",
+    }
+)
 
 # Function names forbidden when called
-_FORBIDDEN_CALLS = frozenset({
-    "eval", "exec", "open", "execfile", "__import__",
-    "compile", "breakpoint", "input", "getattr", "setattr",
-    "delattr", "globals", "locals", "vars",
-})
+_FORBIDDEN_CALLS = frozenset(
+    {
+        "eval",
+        "exec",
+        "open",
+        "execfile",
+        "__import__",
+        "compile",
+        "breakpoint",
+        "input",
+        "getattr",
+        "setattr",
+        "delattr",
+        "globals",
+        "locals",
+        "vars",
+    }
+)
 
 # Restricted builtins — only safe ones
 _SAFE_BUILTINS = {
-    "True": True, "False": False, "None": None,
-    "abs": abs, "all": all, "any": any,
-    "bool": bool, "float": float, "int": int,
-    "len": len, "max": max, "min": min,
-    "round": round, "sorted": sorted, "str": str,
-    "sum": sum, "tuple": tuple, "list": list,
+    "True": True,
+    "False": False,
+    "None": None,
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "float": float,
+    "int": int,
+    "len": len,
+    "max": max,
+    "min": min,
+    "round": round,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "list": list,
 }
 
 
