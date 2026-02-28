@@ -10,10 +10,6 @@ from google.genai import types
 
 from pyflow.tools.condition import _SAFE_BUILTINS, _validate_ast
 
-# Indirection layer so the word 'eval' only appears once at the call site
-_do_eval = eval  # noqa: A001
-
-
 class ExprAgent(BaseAgent):
     """Non-LLM agent that evaluates a safe Python expression.
 
@@ -38,7 +34,7 @@ class ExprAgent(BaseAgent):
         try:
             variables = {key: ctx.session.state.get(key) for key in self.input_keys}
             env = {"__builtins__": _SAFE_BUILTINS, **variables}
-            result = _do_eval(self.expression, env)
+            result = eval(self.expression, env)  # noqa: S307 — AST-validated sandbox
         except Exception as exc:
             yield Event(
                 author=self.name,
@@ -51,7 +47,6 @@ class ExprAgent(BaseAgent):
             )
             return
 
-        ctx.session.state[self.output_key] = result
         result_text = json.dumps(result) if not isinstance(result, str) else result
         yield Event(
             author=self.name,

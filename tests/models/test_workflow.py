@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -396,6 +399,20 @@ class TestOrchestrationConfigExpanded:
         with pytest.raises(ValidationError):
             OrchestrationConfig(type="llm_routed", agents=["a"])
 
+    def test_react_with_planner_config(self):
+        config = OrchestrationConfig(
+            type="react",
+            agent="reasoner",
+            planner="builtin",
+            planner_config={"thinking_budget": 1024},
+        )
+        assert config.planner == "builtin"
+        assert config.planner_config == {"thinking_budget": 1024}
+
+    def test_planner_config_defaults_to_none(self):
+        config = OrchestrationConfig(type="react", agent="reasoner")
+        assert config.planner_config is None
+
     def test_loop_with_max_iterations(self):
         config = OrchestrationConfig(type="loop", agents=["a", "b"], max_iterations=5)
         assert config.max_iterations == 5
@@ -421,3 +438,48 @@ class TestOrchestrationConfigExpanded:
     def test_loop_requires_agents(self):
         with pytest.raises(ValidationError):
             OrchestrationConfig(type="loop")
+
+
+class TestFromYaml:
+    """Tests for WorkflowDef.from_yaml() classmethod."""
+
+    def test_from_yaml_loads_valid_workflow(self, tmp_path: Path):
+        yaml_content = textwrap.dedent("""\
+            name: test_workflow
+            description: A test workflow
+            agents:
+              - name: greeter
+                type: llm
+                model: gemini-2.5-flash
+                instruction: Say hello
+                tools: []
+            orchestration:
+              type: sequential
+              agents:
+                - greeter
+        """)
+        yaml_file = tmp_path / "workflow.yaml"
+        yaml_file.write_text(yaml_content)
+
+        wf = WorkflowDef.from_yaml(yaml_file)
+
+        assert wf.name == "test_workflow"
+        assert wf.description == "A test workflow"
+        assert len(wf.agents) == 1
+        assert wf.agents[0].name == "greeter"
+        assert wf.orchestration.type == "sequential"
+        assert wf.orchestration.agents == ["greeter"]
+
+    def test_from_yaml_file_not_found(self):
+        with pytest.raises(FileNotFoundError, match="Workflow file not found"):
+            WorkflowDef.from_yaml(Path("/nonexistent/workflow.yaml"))
+
+    def test_from_yaml_invalid_yaml(self, tmp_path: Path):
+        yaml_content = textwrap.dedent("""\
+            name: incomplete
+        """)
+        yaml_file = tmp_path / "bad.yaml"
+        yaml_file.write_text(yaml_content)
+
+        with pytest.raises(ValidationError):
+            WorkflowDef.from_yaml(yaml_file)

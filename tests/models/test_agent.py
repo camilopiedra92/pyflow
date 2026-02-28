@@ -216,6 +216,178 @@ class TestAgentConfigExpr:
         assert agent.sub_agents is None
 
 
+class TestAgentConfigDescription:
+    def test_description_defaults_to_empty(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.description == ""
+
+    def test_description_set_explicitly(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            description="Handles data fetching",
+        )
+        assert agent.description == "Handles data fetching"
+
+
+class TestAgentConfigIncludeContents:
+    def test_include_contents_defaults_to_default(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.include_contents == "default"
+
+    def test_include_contents_none(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            include_contents="none",
+        )
+        assert agent.include_contents == "none"
+
+    def test_include_contents_invalid_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentConfig(
+                name="test",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Do stuff",
+                include_contents="all",
+            )
+
+
+class TestAgentConfigSchemas:
+    def test_output_schema_defaults_to_none(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.output_schema is None
+
+    def test_input_schema_defaults_to_none(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.input_schema is None
+
+    def test_output_schema_set(self):
+        schema = {
+            "type": "object",
+            "properties": {"result": {"type": "string"}},
+            "required": ["result"],
+        }
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            output_schema=schema,
+        )
+        assert agent.output_schema == schema
+
+    def test_input_schema_set(self):
+        schema = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        }
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            input_schema=schema,
+        )
+        assert agent.input_schema == schema
+
+
+class TestAgentConfigGenerationConfig:
+    def test_temperature_defaults_to_none(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.temperature is None
+
+    def test_temperature_set(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            temperature=0.7,
+        )
+        assert agent.temperature == 0.7
+
+    def test_max_output_tokens_set(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            max_output_tokens=1024,
+        )
+        assert agent.max_output_tokens == 1024
+
+    def test_top_p_set(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            top_p=0.9,
+        )
+        assert agent.top_p == 0.9
+
+    def test_top_k_set(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            top_k=40,
+        )
+        assert agent.top_k == 40
+
+    def test_all_generation_params(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            temperature=0.5,
+            max_output_tokens=2048,
+            top_p=0.95,
+            top_k=50,
+        )
+        assert agent.temperature == 0.5
+        assert agent.max_output_tokens == 2048
+        assert agent.top_p == 0.95
+        assert agent.top_k == 50
+
+
+class TestAgentConfigAgentTools:
+    def test_agent_tools_defaults_to_none(self):
+        agent = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
+        )
+        assert agent.agent_tools is None
+
+    def test_agent_tools_set(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            agent_tools=["summarizer", "translator"],
+        )
+        assert agent.agent_tools == ["summarizer", "translator"]
+
+
 class TestAgentConfigInvalidType:
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):

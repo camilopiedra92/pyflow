@@ -88,9 +88,9 @@ class PyFlowPlatform:
         return self.workflows.list_workflows()
 
     def agent_cards(self) -> list[AgentCard]:
-        """Auto-generate A2A agent cards from workflow registry."""
+        """Load A2A agent cards from agent package directories."""
         self._ensure_booted()
-        return self._a2a.generate_all(self.workflows.list_workflows())
+        return self._a2a.load_all(Path(self.config.workflows_dir))
 
     @property
     def is_booted(self) -> bool:

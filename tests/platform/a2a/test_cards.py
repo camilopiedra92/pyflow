@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 
 from pyflow.models.a2a import AgentCard
 from pyflow.models.workflow import SkillDef
@@ -145,3 +147,85 @@ class TestCardStructure:
             assert skill.name
             assert skill.description
             assert isinstance(skill.tags, list)
+
+
+class TestLoadCard:
+    def test_load_card_from_json(self, tmp_path: Path) -> None:
+        """load_card() reads agent-card.json from a package directory."""
+        card_data = {
+            "name": "test_agent",
+            "description": "Test agent",
+            "url": "http://localhost:8000/a2a/test_agent",
+            "version": "1.0.0",
+            "skills": [],
+        }
+        (tmp_path / "agent-card.json").write_text(json.dumps(card_data))
+
+        gen = AgentCardGenerator()
+        card = gen.load_card(tmp_path)
+
+        assert isinstance(card, AgentCard)
+        assert card.name == "test_agent"
+        assert card.url == "http://localhost:8000/a2a/test_agent"
+
+    def test_load_card_with_skills(self, tmp_path: Path) -> None:
+        """load_card() deserializes skills from JSON."""
+        card_data = {
+            "name": "skilled_agent",
+            "description": "Has skills",
+            "url": "http://localhost:8000/a2a/skilled_agent",
+            "version": "2.0.0",
+            "skills": [
+                {"id": "s1", "name": "Skill One", "description": "First", "tags": ["a"]},
+            ],
+        }
+        (tmp_path / "agent-card.json").write_text(json.dumps(card_data))
+
+        gen = AgentCardGenerator()
+        card = gen.load_card(tmp_path)
+
+        assert card.version == "2.0.0"
+        assert len(card.skills) == 1
+        assert card.skills[0].id == "s1"
+
+
+class TestLoadAll:
+    def test_load_all_from_agent_packages(self, tmp_path: Path) -> None:
+        """load_all() loads cards from all agent package subdirs."""
+        for name in ["agent_a", "agent_b"]:
+            pkg = tmp_path / name
+            pkg.mkdir()
+            card_data = {
+                "name": name,
+                "description": f"Desc {name}",
+                "url": f"http://localhost/{name}",
+                "skills": [],
+            }
+            (pkg / "agent-card.json").write_text(json.dumps(card_data))
+
+        gen = AgentCardGenerator()
+        cards = gen.load_all(tmp_path)
+
+        assert len(cards) == 2
+        assert [c.name for c in cards] == ["agent_a", "agent_b"]
+
+    def test_load_all_skips_dirs_without_card(self, tmp_path: Path) -> None:
+        """load_all() ignores subdirectories without agent-card.json."""
+        pkg = tmp_path / "has_card"
+        pkg.mkdir()
+        (pkg / "agent-card.json").write_text(
+            json.dumps({"name": "has_card", "description": "", "url": "http://x", "skills": []})
+        )
+
+        no_card = tmp_path / "no_card"
+        no_card.mkdir()
+
+        gen = AgentCardGenerator()
+        cards = gen.load_all(tmp_path)
+        assert len(cards) == 1
+        assert cards[0].name == "has_card"
+
+    def test_load_all_empty_dir(self, tmp_path: Path) -> None:
+        """Empty directory returns empty list."""
+        gen = AgentCardGenerator()
+        assert gen.load_all(tmp_path) == []

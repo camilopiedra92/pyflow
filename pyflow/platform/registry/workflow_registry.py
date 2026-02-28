@@ -7,7 +7,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from pyflow.models.workflow import WorkflowDef
-from pyflow.platform.registry.discovery import scan_directory
+from pyflow.platform.registry.discovery import scan_agent_packages, scan_directory
 
 if TYPE_CHECKING:
     from pyflow.platform.registry.tool_registry import ToolRegistry
@@ -29,10 +29,21 @@ class WorkflowRegistry:
         self._workflows: dict[str, HydratedWorkflow] = {}
 
     def discover(self, directory: Path) -> None:
-        """Scan directory for YAML workflow files, parse into WorkflowDef, store."""
-        for yaml_path in scan_directory(directory, ".yaml"):
-            workflow_def = self._load_yaml(yaml_path)
-            self._workflows[workflow_def.name] = HydratedWorkflow(definition=workflow_def)
+        """Scan directory for workflow definitions.
+
+        Supports two layouts:
+        - Agent packages: directory/*/workflow.yaml (preferred)
+        - Flat YAML: directory/*.yaml (legacy)
+        """
+        packages = scan_agent_packages(directory)
+        if packages:
+            for pkg_dir in packages:
+                workflow_def = self._load_yaml(pkg_dir / "workflow.yaml")
+                self._workflows[workflow_def.name] = HydratedWorkflow(definition=workflow_def)
+        else:
+            for yaml_path in scan_directory(directory, ".yaml"):
+                workflow_def = self._load_yaml(yaml_path)
+                self._workflows[workflow_def.name] = HydratedWorkflow(definition=workflow_def)
 
     def _load_yaml(self, path: Path) -> WorkflowDef:
         """Load and validate a YAML file into a WorkflowDef."""

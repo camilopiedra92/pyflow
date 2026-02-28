@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal
 
+import yaml
 from pydantic import BaseModel, model_validator
 
 from pyflow.models.agent import AgentConfig
@@ -50,6 +52,7 @@ class OrchestrationConfig(BaseModel):
     agent: str | None = None  # for react (single agent)
     router: str | None = None  # for llm_routed
     planner: str | None = None  # for react
+    planner_config: dict[str, Any] | None = None  # for react/builtin planner
     max_iterations: int | None = None  # for loop
 
     @model_validator(mode="after")
@@ -169,3 +172,11 @@ class WorkflowDef(BaseModel):
             )
 
         return self
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> WorkflowDef:
+        """Load and validate a YAML file into a WorkflowDef."""
+        if not path.exists():
+            raise FileNotFoundError(f"Workflow file not found: {path}")
+        data = yaml.safe_load(path.read_text())
+        return cls(**data)

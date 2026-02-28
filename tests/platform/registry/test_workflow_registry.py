@@ -146,6 +146,18 @@ def test_all_returns_hydrated_list(tmp_path: Path, registry: WorkflowRegistry) -
     assert all(isinstance(hw, HydratedWorkflow) for hw in hydrated_list)
 
 
+def test_discover_agent_packages(tmp_path: Path, registry: WorkflowRegistry) -> None:
+    """discover() scans agent packages (dirs with workflow.yaml) when path contains them."""
+    pkg = tmp_path / "test_pkg"
+    pkg.mkdir()
+    (pkg / "workflow.yaml").write_text(_VALID_WORKFLOW_YAML)
+    (pkg / "__init__.py").touch()
+
+    registry.discover(tmp_path)
+    assert len(registry) == 1
+    assert "test_workflow" in registry
+
+
 def test_hydrate_placeholder(registry: WorkflowRegistry) -> None:
     """hydrate() is a no-op placeholder for Phase 2B."""
     tool_registry = ToolRegistry()

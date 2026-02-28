@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import functools
 from typing import TYPE_CHECKING, Union
 
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents.loop_agent import LoopAgent
 from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
-from google.adk.planners import PlanReActPlanner
+from google.adk.planners import BuiltInPlanner, PlanReActPlanner
+from google.adk.tools.agent_tool import AgentTool
+from google.genai import types
 
 from pyflow.models.agent import AgentConfig
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.agents.code_agent import CodeAgent
-from pyflow.platform.agents.dag_agent import DagAgent, DagNode
+from pyflow.platform.agents.dag_agent import DagAgent, DagNodeRuntime
 from pyflow.platform.agents.expr_agent import ExprAgent
 from pyflow.platform.agents.tool_agent import ToolAgent
 from pyflow.platform.callbacks import resolve_callback
+from pyflow.platform.hydration.schema import json_schema_to_pydantic
 
 if TYPE_CHECKING:
     from google.adk.agents.base_agent import BaseAgent
@@ -22,17 +26,12 @@ if TYPE_CHECKING:
 
     from pyflow.platform.registry.tool_registry import ToolRegistry
 
-# Lazy import — LiteLlm requires google-adk[extensions] which may not be installed.
-LiteLlm = None
 
-
+@functools.lru_cache(maxsize=1)
 def _get_litellm():
     """Lazy-load LiteLlm to avoid import errors when extensions are not installed."""
-    global LiteLlm  # noqa: PLW0603
-    if LiteLlm is None:
-        from google.adk.models.lite_llm import LiteLlm as _LiteLlm
+    from google.adk.models.lite_llm import LiteLlm
 
-        LiteLlm = _LiteLlm
     return LiteLlm
 
 
@@ -58,10 +57,11 @@ class WorkflowHydrator:
         return self._build_orchestration(workflow, agents)
 
     def _build_all_agents(self, configs: list[AgentConfig]) -> dict[str, BaseAgent]:
-        """Build all agents, resolving sub_agents references.
+        """Build all agents, resolving sub_agents and agent_tools references.
 
-        First pass builds leaf agents (no sub_agent dependencies): llm, code, tool.
+        First pass builds leaf agents (no sub_agent dependencies): llm, code, tool, expr.
         Second pass builds workflow agents (may reference other agents as sub_agents).
+        Third pass wraps referenced agents as AgentTool and appends to agent's tools.
         """
         agents: dict[str, BaseAgent] = {}
 
@@ -81,6 +81,14 @@ class WorkflowHydrator:
         for config in configs:
             if config.type in ("sequential", "parallel", "loop"):
                 agents[config.name] = self._build_workflow_agent(config, agents)
+
+        # Third pass: wrap referenced agents as AgentTool
+        for config in configs:
+            if config.agent_tools:
+                agent = agents[config.name]
+                for ref_name in config.agent_tools:
+                    ref_agent = agents[ref_name]
+                    agent.tools.append(AgentTool(agent=ref_agent))
 
         return agents
 
@@ -102,6 +110,21 @@ class WorkflowHydrator:
         }
         if config.output_key:
             kwargs["output_key"] = config.output_key
+        if config.description:
+            kwargs["description"] = config.description
+        if config.include_contents != "default":
+            kwargs["include_contents"] = config.include_contents
+        if config.output_schema:
+            kwargs["output_schema"] = json_schema_to_pydantic(
+                config.output_schema, f"{config.name}_output"
+            )
+        if config.input_schema:
+            kwargs["input_schema"] = json_schema_to_pydantic(
+                config.input_schema, f"{config.name}_input"
+            )
+        gen_config = self._build_generate_content_config(config)
+        if gen_config:
+            kwargs["generate_content_config"] = gen_config
 
         return LlmAgent(**kwargs)
 
@@ -173,16 +196,18 @@ class WorkflowHydrator:
                     kwargs["max_iterations"] = orch.max_iterations
                 return LoopAgent(**kwargs)
             case "react":
-                assert orch.agent is not None
+                if not orch.agent:
+                    raise ValueError("react orchestration requires 'agent'")
                 agent = agents[orch.agent]
-                planner = self._resolve_planner(orch.planner)
+                planner = self._resolve_planner(orch.planner, orch.planner_config)
                 if planner is not None:
                     agent.planner = planner
                 return agent
             case "dag":
-                assert orch.nodes is not None
+                if not orch.nodes:
+                    raise ValueError("dag orchestration requires 'nodes'")
                 dag_nodes = [
-                    DagNode(
+                    DagNodeRuntime(
                         name=node.agent,
                         agent=agents[node.agent],
                         depends_on=set(node.depends_on),
@@ -195,8 +220,10 @@ class WorkflowHydrator:
                     sub_agents=[agents[node.agent] for node in orch.nodes],
                 )
             case "llm_routed":
-                assert orch.router is not None
-                assert orch.agents is not None
+                if not orch.router:
+                    raise ValueError("llm_routed orchestration requires 'router'")
+                if not orch.agents:
+                    raise ValueError("llm_routed orchestration requires 'agents'")
                 router = agents[orch.router]
                 available = [agents[n] for n in orch.agents]
                 router.sub_agents = available
@@ -233,8 +260,35 @@ class WorkflowHydrator:
                 result[param_key] = cb
         return result
 
-    def _resolve_planner(self, planner_name: str | None):
+    def _resolve_planner(
+        self,
+        planner_name: str | None,
+        planner_config: dict | None = None,
+    ):
         """Resolve a planner name to an ADK planner instance."""
         if planner_name == "plan_react":
             return PlanReActPlanner()
+        if planner_name == "builtin":
+            kwargs = {}
+            if planner_config and "thinking_budget" in planner_config:
+                kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=planner_config["thinking_budget"],
+                )
+            return BuiltInPlanner(**kwargs)
+        return None
+
+    @staticmethod
+    def _build_generate_content_config(config: AgentConfig) -> types.GenerateContentConfig | None:
+        """Build GenerateContentConfig from agent generation parameters."""
+        gen_kwargs: dict = {}
+        if config.temperature is not None:
+            gen_kwargs["temperature"] = config.temperature
+        if config.max_output_tokens is not None:
+            gen_kwargs["max_output_tokens"] = config.max_output_tokens
+        if config.top_p is not None:
+            gen_kwargs["top_p"] = config.top_p
+        if config.top_k is not None:
+            gen_kwargs["top_k"] = config.top_k
+        if gen_kwargs:
+            return types.GenerateContentConfig(**gen_kwargs)
         return None

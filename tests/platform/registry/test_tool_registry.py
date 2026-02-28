@@ -120,6 +120,20 @@ class TestBuiltinToolCatalog:
         tool = registry.get_function_tool("http_request")
         assert tool is not None
 
+    def test_resolve_google_search(self) -> None:
+        """google_search ADK built-in should be resolvable via get_function_tool."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("google_search")
+        assert tool is not None
+
+    def test_resolve_load_memory(self) -> None:
+        """load_memory ADK built-in should be resolvable via get_function_tool."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("load_memory")
+        assert tool is not None
+
     def test_unknown_tool_raises(self) -> None:
         """get_function_tool() should raise KeyError for unknown tool name."""
         registry = ToolRegistry()

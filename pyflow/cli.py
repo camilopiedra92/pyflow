@@ -13,6 +13,64 @@ from pyflow.models.platform import PlatformConfig
 app = typer.Typer(name="pyflow", help="PyFlow ADK Platform")
 logger = structlog.get_logger()
 
+_INIT_AGENT_PY = '''\
+"""{name} — ADK-compatible agent package."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from pyflow.models.workflow import WorkflowDef
+from pyflow.platform.hydration.hydrator import WorkflowHydrator
+from pyflow.platform.registry.tool_registry import ToolRegistry
+
+_WORKFLOW_PATH = Path(__file__).parent / "workflow.yaml"
+
+
+def _build_agent():
+    """Hydrate YAML workflow into an ADK agent tree."""
+    tools = ToolRegistry()
+    tools.discover()
+    workflow = WorkflowDef.from_yaml(_WORKFLOW_PATH)
+    hydrator = WorkflowHydrator(tools)
+    return hydrator.hydrate(workflow)
+
+
+root_agent = _build_agent()
+'''
+
+_INIT_WORKFLOW_YAML = '''\
+name: {name}
+description: "{name} workflow"
+
+agents:
+  - name: main
+    type: llm
+    model: gemini-2.5-flash
+    instruction: "You are a helpful assistant."
+    output_key: result
+
+orchestration:
+  type: sequential
+  agents: [main]
+
+runtime:
+  session_service: in_memory
+'''
+
+_INIT_CARD_JSON = '''\
+{{
+  "name": "{name}",
+  "description": "{name} workflow",
+  "url": "http://localhost:8000/a2a/{name}",
+  "version": "1.0.0",
+  "protocolVersion": "0.2.6",
+  "capabilities": {{}},
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["application/json"],
+  "skills": []
+}}
+'''
+
 
 @app.command()
 def run(
@@ -20,7 +78,7 @@ def run(
     input_json: str = typer.Option("{}", "--input", "-i", help="JSON input for the workflow"),
     user_id: str = typer.Option("default", "--user-id", "-u", help="User ID for session"),
     workflows_dir: str = typer.Option(
-        "workflows", "--workflows-dir", "-w", help="Workflows directory"
+        "agents", "--workflows-dir", "-w", help="Workflows directory"
     ),
 ) -> None:
     """Run a workflow by name."""
@@ -71,7 +129,7 @@ def validate(
 def list_cmd(
     tools: bool = typer.Option(False, "--tools", "-t", help="List platform tools"),
     workflows: bool = typer.Option(False, "--workflows", "-w", help="List workflows"),
-    workflows_dir: str = typer.Option("workflows", "--workflows-dir", help="Workflows directory"),
+    workflows_dir: str = typer.Option("agents", "--workflows-dir", help="Workflows directory"),
 ) -> None:
     """List registered tools or discovered workflows."""
     config = PlatformConfig(workflows_dir=workflows_dir)
@@ -99,10 +157,29 @@ def serve(
     host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
     port: int = typer.Option(8000, "--port", "-p", help="Server port"),
     workflows_dir: str = typer.Option(
-        "workflows", "--workflows-dir", "-w", help="Workflows directory"
+        "agents", "--workflows-dir", "-w", help="Workflows directory"
     ),
 ) -> None:
     """Start the FastAPI server."""
     import uvicorn
 
     uvicorn.run("pyflow.server:app", host=host, port=port, reload=False)
+
+
+@app.command()
+def init(
+    name: str = typer.Argument(help="Name for the new agent package"),
+    agents_dir: str = typer.Option("agents", "--agents-dir", help="Agents directory"),
+) -> None:
+    """Scaffold a new agent package."""
+    pkg_dir = Path(agents_dir) / name
+    if pkg_dir.exists():
+        typer.echo(f"Package already exists: {pkg_dir}", err=True)
+        raise typer.Exit(code=1)
+
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "__init__.py").write_text("from .agent import root_agent\n")
+    (pkg_dir / "agent.py").write_text(_INIT_AGENT_PY.format(name=name))
+    (pkg_dir / "workflow.yaml").write_text(_INIT_WORKFLOW_YAML.format(name=name))
+    (pkg_dir / "agent-card.json").write_text(_INIT_CARD_JSON.format(name=name))
+    typer.echo(f"Created agent package: {pkg_dir}")

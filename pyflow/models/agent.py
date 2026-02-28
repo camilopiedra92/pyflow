@@ -16,6 +16,16 @@ class AgentConfig(BaseModel):
     output_key: str | None = None
     sub_agents: list[str] | None = None
     callbacks: dict[str, str] | None = None
+    description: str = ""
+    include_contents: Literal["default", "none"] = "default"
+    # LLM schema fields
+    output_schema: dict[str, Any] | None = None
+    input_schema: dict[str, Any] | None = None
+    # LLM generation config fields
+    temperature: float | None = None
+    max_output_tokens: int | None = None
+    top_p: float | None = None
+    top_k: int | None = None
     # CodeAgent fields
     function: str | None = None
     input_keys: list[str] | None = None
@@ -24,6 +34,8 @@ class AgentConfig(BaseModel):
     tool_config: dict[str, Any] | None = None
     # ExprAgent fields
     expression: str | None = None
+    # AgentTool fields
+    agent_tools: list[str] | None = None
 
     @model_validator(mode="after")
     def _validate_by_type(self) -> AgentConfig:

@@ -263,7 +263,7 @@ LLM agents always write text to state, even if the text is JSON. When you need t
 # Code agent parses JSON string into a dict
 - name: parse_params
   type: code
-  function: workflows.helpers.parse_currency_request
+  function: agents.exchange_tracker.helpers.parse_currency_request
   input_keys: [parsed_input]
   output_key: params
 
@@ -962,7 +962,7 @@ a2a:                                 # optional, A2A protocol config
 
 ## A2A Protocol
 
-Workflows can expose skills via the Agent-to-Agent (A2A) protocol. Agent cards are auto-generated from the workflow definition and served at `/a2a/agent-card.json` when the server is running.
+Workflows can expose skills via the Agent-to-Agent (A2A) protocol. Agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot and served at `/.well-known/agent-card.json`.
 
 ```yaml
 a2a:

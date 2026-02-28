@@ -185,16 +185,15 @@ def test_list_workflows_delegates_to_registry() -> None:
 
 
 def test_agent_cards_delegates_to_generator() -> None:
+    """agent_cards() loads from files via load_all()."""
     p = _make_booted_platform()
 
-    fake_workflows = [MagicMock(spec=WorkflowDef)]
     fake_card = AgentCard(name="test", url="http://localhost:8000/a2a/test")
-    p.workflows.list_workflows = MagicMock(return_value=fake_workflows)
-    p._a2a.generate_all = MagicMock(return_value=[fake_card])
+    p._a2a.load_all = MagicMock(return_value=[fake_card])
 
     result = p.agent_cards()
 
-    p._a2a.generate_all.assert_called_once_with(fake_workflows)
+    p._a2a.load_all.assert_called_once_with(Path(p.config.workflows_dir))
     assert len(result) == 1
     assert isinstance(result[0], AgentCard)
     assert result[0].name == "test"

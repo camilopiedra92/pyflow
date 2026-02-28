@@ -172,3 +172,86 @@ class TestDatetimeState:
         assert "current_date" in call_kwargs["state"]
         assert "current_datetime" in call_kwargs["state"]
         assert call_kwargs["state"]["timezone"] == "UTC"
+
+
+class TestRunStreaming:
+    async def test_yields_events(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        mock_event = MagicMock()
+        mock_runner = MagicMock()
+        mock_session = MagicMock()
+        mock_session.id = "sess-1"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            yield mock_event
+
+        mock_runner.run_async = fake_run
+
+        events = [e async for e in executor.run_streaming(mock_runner, message="hi")]
+        assert len(events) == 1
+        assert events[0] is mock_event
+
+    async def test_creates_session_with_datetime_state(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        mock_runner = MagicMock()
+        mock_session = MagicMock()
+        mock_session.id = "sess-1"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            return
+            yield
+
+        mock_runner.run_async = fake_run
+
+        async for _ in executor.run_streaming(mock_runner, message="hi"):
+            pass
+
+        call_kwargs = mock_runner.session_service.create_session.call_args[1]
+        assert "state" in call_kwargs
+        assert "current_date" in call_kwargs["state"]
+        assert call_kwargs["state"]["timezone"] == "UTC"
+
+    async def test_session_id_reuses_existing(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        mock_runner = MagicMock()
+        mock_session = MagicMock()
+        mock_session.id = "existing-sess"
+        mock_runner.session_service.get_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            return
+            yield
+
+        mock_runner.run_async = fake_run
+
+        async for _ in executor.run_streaming(
+            mock_runner, message="hi", session_id="existing-sess"
+        ):
+            pass
+
+        mock_runner.session_service.get_session.assert_called_once()
+        mock_runner.session_service.create_session.assert_not_called()
+
+    async def test_session_id_creates_new_when_not_found(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        mock_runner = MagicMock()
+        mock_runner.session_service.get_session = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.id = "new-sess"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            return
+            yield
+
+        mock_runner.run_async = fake_run
+
+        async for _ in executor.run_streaming(
+            mock_runner, message="hi", session_id="missing-sess"
+        ):
+            pass
+
+        mock_runner.session_service.get_session.assert_called_once()
+        mock_runner.session_service.create_session.assert_called_once()

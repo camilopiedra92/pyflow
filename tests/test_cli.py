@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from typer.testing import CliRunner
@@ -150,3 +151,44 @@ class TestListCommand:
             result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
         assert "--tools" in result.stdout or "--workflows" in result.stdout
+
+
+class TestInitCommand:
+    def test_init_creates_agent_package(self, tmp_path: Path) -> None:
+        """init command scaffolds a new agent package directory."""
+        result = runner.invoke(app, ["init", "my_agent", "--agents-dir", str(tmp_path)])
+        assert result.exit_code == 0
+
+        pkg = tmp_path / "my_agent"
+        assert pkg.is_dir()
+        assert (pkg / "__init__.py").exists()
+        assert (pkg / "agent.py").exists()
+        assert (pkg / "agent-card.json").exists()
+        assert (pkg / "workflow.yaml").exists()
+
+    def test_init_existing_package_fails(self, tmp_path: Path) -> None:
+        """init command fails if package directory already exists."""
+        (tmp_path / "existing").mkdir()
+        result = runner.invoke(app, ["init", "existing", "--agents-dir", str(tmp_path)])
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+
+    def test_init_yaml_is_valid(self, tmp_path: Path) -> None:
+        """init command creates a valid workflow.yaml."""
+        import yaml as pyyaml
+        from pyflow.models.workflow import WorkflowDef
+
+        runner.invoke(app, ["init", "test_agent", "--agents-dir", str(tmp_path)])
+        yaml_path = tmp_path / "test_agent" / "workflow.yaml"
+        data = pyyaml.safe_load(yaml_path.read_text())
+        wf = WorkflowDef(**data)
+        assert wf.name == "test_agent"
+
+    def test_init_card_is_valid_json(self, tmp_path: Path) -> None:
+        """init command creates valid agent-card.json."""
+        import json
+
+        runner.invoke(app, ["init", "test_agent", "--agents-dir", str(tmp_path)])
+        card_path = tmp_path / "test_agent" / "agent-card.json"
+        data = json.loads(card_path.read_text())
+        assert data["name"] == "test_agent"

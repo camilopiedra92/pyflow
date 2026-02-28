@@ -133,13 +133,8 @@ class WorkflowExecutor:
         else:
             text = ""
 
-        author = ""
-        if final_event and hasattr(final_event, "author"):
-            author = final_event.author or ""
-
-        usage = None
-        if final_event and hasattr(final_event, "usage_metadata"):
-            usage = final_event.usage_metadata
+        author = getattr(final_event, "author", "") or "" if final_event else ""
+        usage = getattr(final_event, "usage_metadata", None) if final_event else None
 
         return RunResult(
             content=text,
@@ -153,13 +148,28 @@ class WorkflowExecutor:
         runner: Runner,
         user_id: str = "default",
         message: str = "",
+        session_id: str | None = None,
     ) -> AsyncGenerator:
         """Yield events as they arrive for streaming APIs."""
-        session = await runner.session_service.create_session(
-            app_name=self._app_name,
-            user_id=user_id,
-            state=self._datetime_state(),
-        )
+        state = self._datetime_state()
+        if session_id:
+            session = await runner.session_service.get_session(
+                app_name=self._app_name,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if session is None:
+                session = await runner.session_service.create_session(
+                    app_name=self._app_name,
+                    user_id=user_id,
+                    state=state,
+                )
+        else:
+            session = await runner.session_service.create_session(
+                app_name=self._app_name,
+                user_id=user_id,
+                state=state,
+            )
         content = types.Content(
             role="user",
             parts=[types.Part(text=message)],
