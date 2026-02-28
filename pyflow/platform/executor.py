@@ -10,9 +10,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-# Suppress "non-text parts in the response" warning from google.genai SDK.
-# ADK's _build_response_log() accesses resp.text on responses containing
-# function_call parts, which is expected in ReAct tool-calling loops.
+# TODO(ADK>=1.27): Remove when ADK fixes response logging for function_call parts
 logging.getLogger("google_genai.types").setLevel(logging.ERROR)
 
 from pyflow.models.runner import RunResult
@@ -77,15 +75,81 @@ class WorkflowExecutor:
         }
 
     def build_runner(self, agent: BaseAgent, runtime: RuntimeConfig) -> Runner:
-        """Build a fully-configured ADK Runner from workflow runtime config."""
+        """Build a fully-configured ADK Runner from workflow runtime config.
+
+        Wraps the agent in an ADK App to unlock context caching, event compaction,
+        resumability, and app-level plugins. The Runner is then constructed with
+        app= instead of agent=.
+        """
+        from google.adk.apps import App, ResumabilityConfig
+        from google.adk.apps.app import ContextCacheConfig
+        from google.adk.apps.compaction import EventsCompactionConfig
+        from google.adk.plugins.global_instruction_plugin import GlobalInstructionPlugin
+
+        app_plugins = resolve_plugins(runtime.plugins) or []
+        # Always inject GlobalInstructionPlugin for datetime awareness
+        app_plugins.insert(
+            0,
+            GlobalInstructionPlugin(
+                global_instruction="NOW: {current_datetime} ({timezone})."
+            ),
+        )
+
+        app_kwargs: dict = {
+            "name": self._app_name,
+            "root_agent": agent,
+            "plugins": app_plugins,
+        }
+
+        if runtime.context_cache_intervals is not None:
+            cache_kwargs: dict = {"cache_intervals": runtime.context_cache_intervals}
+            if runtime.context_cache_ttl is not None:
+                cache_kwargs["ttl_seconds"] = runtime.context_cache_ttl
+            if runtime.context_cache_min_tokens is not None:
+                cache_kwargs["min_tokens"] = runtime.context_cache_min_tokens
+            app_kwargs["context_cache_config"] = ContextCacheConfig(**cache_kwargs)
+
+        if runtime.compaction_interval is not None and runtime.compaction_overlap is not None:
+            app_kwargs["events_compaction_config"] = EventsCompactionConfig(
+                compaction_interval=runtime.compaction_interval,
+                overlap_size=runtime.compaction_overlap,
+            )
+
+        if runtime.resumable:
+            app_kwargs["resumability_config"] = ResumabilityConfig(is_resumable=True)
+
+        app = App(**app_kwargs)
+
         return Runner(
-            agent=agent,
-            app_name=self._app_name,
+            app=app,
             session_service=self._build_session_service(runtime),
             memory_service=self._build_memory_service(runtime),
             artifact_service=self._build_artifact_service(runtime),
-            plugins=resolve_plugins(runtime.plugins) or None,
+            credential_service=self._build_credential_service(runtime),
         )
+
+    async def _get_or_create_session(self, runner, user_id, session_id):
+        """Get existing session or create a new one with datetime state."""
+        state = self._datetime_state()
+        if session_id:
+            session = await runner.session_service.get_session(
+                app_name=self._app_name,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if session is None:
+                session = await runner.session_service.create_session(
+                    app_name=self._app_name,
+                    user_id=user_id,
+                    state=state,
+                )
+        else:
+            session = await runner.session_service.create_session(
+                app_name=self._app_name,
+                user_id=user_id,
+                state=state,
+            )
+        return session
 
     async def run(
         self,
@@ -99,25 +163,7 @@ class WorkflowExecutor:
         runner.plugin_manager.plugins.append(metrics)
 
         try:
-            state = self._datetime_state()
-            if session_id:
-                session = await runner.session_service.get_session(
-                    app_name=self._app_name,
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-                if session is None:
-                    session = await runner.session_service.create_session(
-                        app_name=self._app_name,
-                        user_id=user_id,
-                        state=state,
-                    )
-            else:
-                session = await runner.session_service.create_session(
-                    app_name=self._app_name,
-                    user_id=user_id,
-                    state=state,
-                )
+            session = await self._get_or_create_session(runner, user_id, session_id)
 
             content = types.Content(
                 role="user",
@@ -157,25 +203,7 @@ class WorkflowExecutor:
         session_id: str | None = None,
     ) -> AsyncGenerator:
         """Yield events as they arrive for streaming APIs."""
-        state = self._datetime_state()
-        if session_id:
-            session = await runner.session_service.get_session(
-                app_name=self._app_name,
-                user_id=user_id,
-                session_id=session_id,
-            )
-            if session is None:
-                session = await runner.session_service.create_session(
-                    app_name=self._app_name,
-                    user_id=user_id,
-                    state=state,
-                )
-        else:
-            session = await runner.session_service.create_session(
-                app_name=self._app_name,
-                user_id=user_id,
-                state=state,
-            )
+        session = await self._get_or_create_session(runner, user_id, session_id)
         content = types.Content(
             role="user",
             parts=[types.Part(text=message)],
@@ -223,5 +251,16 @@ class WorkflowExecutor:
                 from google.adk.artifacts.file_artifact_service import FileArtifactService
 
                 return FileArtifactService(root_dir=runtime.artifact_dir or "./artifacts")
+            case "none":
+                return None
+
+    def _build_credential_service(self, runtime: RuntimeConfig):
+        match runtime.credential_service:
+            case "in_memory":
+                from google.adk.auth.credential_service.in_memory_credential_service import (
+                    InMemoryCredentialService,
+                )
+
+                return InMemoryCredentialService()
             case "none":
                 return None

@@ -100,7 +100,6 @@ class WorkflowHydrator:
         callbacks = self._resolve_callbacks(config.callbacks)
 
         instruction = config.instruction or ""
-        instruction = f"NOW: {{current_datetime}} ({{timezone}}).\n{instruction}"
 
         kwargs: dict = {
             "name": config.name,

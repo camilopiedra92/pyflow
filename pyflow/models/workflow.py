@@ -34,6 +34,16 @@ class RuntimeConfig(BaseModel):
     artifact_service: Literal["in_memory", "file", "none"] = "none"
     artifact_dir: str | None = None
     plugins: list[str] = []
+    credential_service: Literal["in_memory", "none"] = "none"
+    # Context caching (Gemini 2.0+)
+    context_cache_intervals: int | None = None
+    context_cache_ttl: int | None = None  # seconds
+    context_cache_min_tokens: int | None = None
+    # Event compaction (long conversations)
+    compaction_interval: int | None = None
+    compaction_overlap: int | None = None
+    # Resumability
+    resumable: bool = False
 
 
 class DagNode(BaseModel):

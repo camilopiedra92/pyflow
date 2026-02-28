@@ -79,6 +79,13 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 **Required fields:** `model`, `instruction`
 **Optional fields:** `tools`, `output_key`, `callbacks`, `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`
 
+**Callbacks** use Python FQN (fully-qualified names) resolved via `importlib`:
+```yaml
+callbacks:
+  before_agent: "mypackage.callbacks.log_before"
+  after_agent: "mypackage.callbacks.log_after"
+```
+
 **New LLM fields (post ADK alignment):**
 - `description` — used by `llm_routed` orchestration for agent routing (what does this agent do?)
 - `include_contents: "none"` — hides conversation history (isolated sub-tasks)
@@ -94,11 +101,11 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 
 **Instructions can reference state** with `{variable_name}` — resolved from session state at runtime.
 
-**Automatic date awareness:** The hydrator automatically prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction. No manual setup needed — all LLM agents know the current date and time.
+**Automatic date awareness:** The `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM agent instruction at runtime. No manual setup needed — all LLM agents know the current date and time.
 
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (see below), plus any custom tools in `pyflow/tools/`.
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (see below), plus any custom tools in `pyflow/tools/`, plus any Python callable via FQN (e.g. `mypackage.tools.custom_search`).
 
 **ADK built-in tools** (available by name in `tools:` list):
 
@@ -113,6 +120,7 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 | `preload_memory` | Memory | Preload all memories at session start |
 | `load_artifacts` | Artifacts | Load artifacts into the session |
 | `get_user_choice` | Interactive | Async user interaction (long-running) |
+| `transfer_to_agent` | Control | Transfer control to another agent (useful for llm_routed) |
 
 **`output_schema` reference** — enforces structured JSON output at the API level. The LLM can only produce JSON matching this schema:
 
@@ -301,7 +309,7 @@ Agents communicate through **session state** — a shared key-value store that p
 
 ### Automatic date awareness
 
-The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction automatically. No manual setup needed.
+The `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM agent instruction at runtime. No manual setup needed — this is handled by the executor's App model, not by the hydrator.
 
 ### Platform-injected state
 
@@ -379,7 +387,17 @@ runtime:
   memory_service: none           # in_memory | none
   artifact_service: none         # in_memory | file | none
   artifact_dir: null             # for "file" artifact service
-  plugins: []                    # logging | reflect_and_retry
+  credential_service: none       # in_memory | none (for OAuth; use get_secret() for static API keys)
+  plugins: []                    # logging | debug_logging | reflect_and_retry | context_filter | save_files_as_artifacts | multimodal_tool_results
+  # Context caching (Gemini 2.0+)
+  context_cache_intervals: null  # cache every N turns
+  context_cache_ttl: null        # cache TTL in seconds
+  context_cache_min_tokens: null # minimum tokens to trigger caching
+  # Event compaction (long conversations)
+  compaction_interval: null      # compact every N events
+  compaction_overlap: null       # overlap window size
+  # Resumability
+  resumable: false               # enable session resumability
 ```
 
 For production persistence:
@@ -387,7 +405,29 @@ For production persistence:
 runtime:
   session_service: sqlite        # auto-creates pyflow_sessions.db
   plugins: [logging]
+  resumable: true                # enable session resumability
 ```
+
+For long-running Gemini conversations:
+```yaml
+runtime:
+  context_cache_intervals: 5     # cache every 5 turns
+  context_cache_ttl: 1800        # 30 min TTL
+  compaction_interval: 20        # compact every 20 events
+  compaction_overlap: 5          # keep 5 events of overlap
+```
+
+## Tool Authentication
+
+Tools that need API keys use `get_secret(name)` from `pyflow.tools.base`. It checks `PYFLOW_{NAME}` env var first, then the platform secrets dict:
+
+```bash
+# .env (gitignored, auto-loaded by platform.boot())
+PYFLOW_YNAB_API_TOKEN=your-token
+GOOGLE_API_KEY=your-gemini-key
+```
+
+This is the standard approach for all current tools. For OAuth flows (user login, token refresh), use `credential_service: in_memory` in the runtime config instead — ADK's credential service manages per-session tokens via the `ToolContext`.
 
 ## A2A Protocol (Optional)
 

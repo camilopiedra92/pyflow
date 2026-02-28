@@ -486,48 +486,38 @@ class TestHydrateNestedAgents:
 
 
 class TestHydrateCallbacks:
-    def test_callbacks_resolved_and_passed_to_llm_agent(self, mock_tool_registry):
-        """AgentConfig with callbacks -> resolved from registry and passed to LlmAgent."""
-        from pyflow.platform.callbacks import CALLBACK_REGISTRY, register_callback
-
-        # Register a test callback
-        test_cb = MagicMock()
-        register_callback("test_before_agent", test_cb)
-
-        try:
-            agents = [
-                _make_llm_agent_config(
-                    name="cb_agent",
-                    instruction="Do something",
-                    callbacks={"before_agent": "test_before_agent"},
-                ),
-            ]
-            workflow = _make_workflow(agents=agents)
-            hydrator = WorkflowHydrator(mock_tool_registry)
-            root = hydrator.hydrate(workflow)
-
-            llm_agent = root.sub_agents[0]
-            assert llm_agent.before_agent_callback is test_cb
-        finally:
-            # Clean up the registry
-            CALLBACK_REGISTRY.pop("test_before_agent", None)
-
-    def test_unknown_callback_ignored(self, mock_tool_registry):
-        """AgentConfig with unknown callback name -> silently ignored."""
+    def test_callbacks_resolved_via_fqn(self, mock_tool_registry):
+        """AgentConfig with FQN callback -> resolved via importlib and passed to LlmAgent."""
         agents = [
             _make_llm_agent_config(
                 name="cb_agent",
                 instruction="Do something",
-                callbacks={"before_agent": "nonexistent_callback"},
+                callbacks={"before_agent": "json.dumps"},
             ),
         ]
         workflow = _make_workflow(agents=agents)
         hydrator = WorkflowHydrator(mock_tool_registry)
         root = hydrator.hydrate(workflow)
 
+        import json
+
         llm_agent = root.sub_agents[0]
-        # Should not raise; callback simply not set
-        assert llm_agent.name == "cb_agent"
+        assert llm_agent.before_agent_callback is json.dumps
+
+    def test_bad_fqn_callback_raises(self, mock_tool_registry):
+        """AgentConfig with invalid FQN callback -> raises at hydration time."""
+        agents = [
+            _make_llm_agent_config(
+                name="cb_agent",
+                instruction="Do something",
+                callbacks={"before_agent": "nonexistent_module.func"},
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+
+        with pytest.raises(ModuleNotFoundError):
+            hydrator.hydrate(workflow)
 
     def test_no_callbacks_returns_empty(self, mock_tool_registry):
         """AgentConfig with no callbacks -> no callback kwargs passed."""

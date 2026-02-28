@@ -176,9 +176,49 @@ class TestBuiltinToolCatalog:
         tool = registry.get_function_tool("get_user_choice")
         assert tool is not None
 
+    def test_resolve_transfer_to_agent(self) -> None:
+        """transfer_to_agent ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("transfer_to_agent")
+        assert tool is not None
+
     def test_unknown_tool_raises(self) -> None:
         """get_function_tool() should raise KeyError for unknown tool name."""
         registry = ToolRegistry()
         registry.discover()
         with pytest.raises(KeyError):
             registry.get_function_tool("nonexistent_tool")
+
+
+class TestFQNToolResolution:
+    def test_fqn_resolves_callable(self) -> None:
+        """FQN like 'json.dumps' should resolve to a FunctionTool."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("json.dumps")
+        assert isinstance(tool, FunctionTool)
+
+    def test_fqn_resolves_stdlib_function(self) -> None:
+        """FQN for a stdlib function should resolve."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("os.path.exists")
+        assert isinstance(tool, FunctionTool)
+
+    def test_fqn_non_callable_raises(self) -> None:
+        """FQN pointing to a non-callable should raise KeyError."""
+        registry = ToolRegistry()
+        with pytest.raises(KeyError, match="does not resolve to a callable"):
+            registry.get_function_tool("os.sep")
+
+    def test_fqn_bad_module_raises(self) -> None:
+        """FQN with non-existent module should raise."""
+        registry = ToolRegistry()
+        with pytest.raises((KeyError, ModuleNotFoundError)):
+            registry.get_function_tool("nonexistent_module.func")
+
+    def test_fqn_does_not_shadow_custom_tools(self) -> None:
+        """Custom tools should take priority over FQN resolution."""
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        tool = registry.get_function_tool("dummy_tool")
+        assert isinstance(tool, FunctionTool)

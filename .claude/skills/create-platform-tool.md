@@ -154,7 +154,12 @@ if is_private_url(url):
 
 ### Accessing Secrets (API Tokens)
 
-Tools that need API tokens or credentials use `get_secret(name)` from `pyflow.tools.base`. It checks the `PYFLOW_{NAME}` environment variable first (uppercased), then falls back to the platform secrets dict.
+PyFlow has two auth mechanisms — use the right one for your case:
+
+- **`get_secret()`** — for static API keys, bearer tokens, webhook URLs. Set once in `.env`, read by the tool. **This is the standard approach for most tools.**
+- **`credential_service`** — for OAuth flows where the user logs in interactively (Google OAuth, GitHub, etc.). Configured in `runtime:` YAML, managed by ADK's `ToolContext`. Only needed for dynamic, per-session credentials.
+
+For static API keys, use `get_secret(name)` from `pyflow.tools.base`. It checks the `PYFLOW_{NAME}` environment variable first (uppercased), then falls back to the platform secrets dict.
 
 ```python
 from pyflow.tools.base import BasePlatformTool, get_secret

@@ -342,3 +342,12 @@ class TestStreaming:
         )
         assert response.status_code == 200
         assert "text/event-stream" in response.headers["content-type"]
+
+
+class TestCORSConfig:
+    def test_cors_origins_default_empty(self):
+        """PlatformConfig defaults to no CORS origins (middleware not added)."""
+        from pyflow.models.platform import PlatformConfig
+
+        config = PlatformConfig(load_dotenv=False)
+        assert config.cors_origins == []
