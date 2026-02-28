@@ -110,12 +110,10 @@ async def stream_workflow(name: str, input_data: WorkflowInput):
     if hw.agent is None:
         raise HTTPException(status_code=500, detail=f"Workflow '{name}' not hydrated")
 
-    runtime = hw.definition.runtime
-    runner = platform.executor.build_runner(hw.agent, runtime)
-
     async def _event_stream():
         async for event in platform.executor.run_streaming(
-            runner,
+            agent=hw.agent,
+            runtime=hw.definition.runtime,
             user_id=input_data.user_id,
             message=input_data.message,
         ):

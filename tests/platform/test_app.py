@@ -152,15 +152,17 @@ async def test_run_workflow_delegates_to_executor() -> None:
 
     p.workflows.get = MagicMock(return_value=fake_hw)
     expected = RunResult(content="done")
-    fake_runner = MagicMock()
-    p.executor.build_runner = MagicMock(return_value=fake_runner)
     p.executor.run = AsyncMock(return_value=expected)
 
     result = await p.run_workflow("my_wf", {"message": "hello"})
 
     p.workflows.get.assert_called_once_with("my_wf")
-    p.executor.build_runner.assert_called_once_with(fake_agent, fake_hw.definition.runtime)
-    p.executor.run.assert_awaited_once_with(fake_runner, user_id="default", message="hello")
+    p.executor.run.assert_awaited_once_with(
+        agent=fake_agent,
+        runtime=fake_hw.definition.runtime,
+        user_id="default",
+        message="hello",
+    )
     assert isinstance(result, RunResult)
     assert result.content == "done"
 

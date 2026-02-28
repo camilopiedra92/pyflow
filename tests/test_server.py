@@ -325,9 +325,7 @@ class TestStreaming:
         client._mock_platform.workflows = MagicMock()
         client._mock_platform.workflows.get.return_value = mock_hw
 
-        mock_runner = MagicMock()
         client._mock_platform.executor = MagicMock()
-        client._mock_platform.executor.build_runner.return_value = mock_runner
 
         # Return an empty async generator
         async def _empty_gen(*args, **kwargs):

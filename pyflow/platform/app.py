@@ -131,10 +131,10 @@ class PyFlowPlatform:
         hw = self.workflows.get(name)
         if hw.agent is None:
             raise RuntimeError(f"Workflow '{name}' not hydrated.")
-        runtime = hw.definition.runtime
-        runner = self.executor.build_runner(hw.agent, runtime)
         message = input_data.get("message", "")
-        return await self.executor.run(runner, user_id=user_id, message=message)
+        return await self.executor.run(
+            agent=hw.agent, runtime=hw.definition.runtime, user_id=user_id, message=message
+        )
 
     async def shutdown(self) -> None:
         """Cleanup platform resources."""
