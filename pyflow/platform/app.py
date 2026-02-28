@@ -54,7 +54,9 @@ class PyFlowPlatform:
         if not self._booted:
             raise RuntimeError("Platform not booted. Call boot() first.")
 
-    async def run_workflow(self, name: str, input_data: dict) -> RunResult:
+    async def run_workflow(
+        self, name: str, input_data: dict, user_id: str = "default",
+    ) -> RunResult:
         """Execute a workflow by name."""
         self._ensure_booted()
         hw = self.workflows.get(name)
@@ -63,7 +65,7 @@ class PyFlowPlatform:
         runtime = hw.definition.runtime
         runner = self.executor.build_runner(hw.agent, runtime)
         message = input_data.get("message", "")
-        return await self.executor.run(runner, message=message)
+        return await self.executor.run(runner, user_id=user_id, message=message)
 
     async def shutdown(self) -> None:
         """Cleanup platform resources."""

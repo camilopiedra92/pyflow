@@ -38,8 +38,42 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert '"output": "done"' in result.stdout
         mock_platform.boot.assert_awaited_once()
-        mock_platform.run_workflow.assert_awaited_once_with("my_workflow", {})
+        mock_platform.run_workflow.assert_awaited_once_with(
+            "my_workflow", {}, user_id="default"
+        )
         mock_platform.shutdown.assert_awaited_once()
+
+    def test_run_with_user_id(self):
+        mock_platform = _make_mock_platform(run_result={"output": "done"})
+        with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
+            result = runner.invoke(
+                app, ["run", "my_workflow", "--user-id", "alice"]
+            )
+        assert result.exit_code == 0
+        mock_platform.run_workflow.assert_awaited_once_with(
+            "my_workflow", {}, user_id="alice"
+        )
+
+    def test_run_with_user_id_short_flag(self):
+        mock_platform = _make_mock_platform(run_result={"output": "done"})
+        with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
+            result = runner.invoke(app, ["run", "my_workflow", "-u", "bob"])
+        assert result.exit_code == 0
+        mock_platform.run_workflow.assert_awaited_once_with(
+            "my_workflow", {}, user_id="bob"
+        )
+
+    def test_run_with_user_id_and_input(self):
+        mock_platform = _make_mock_platform(run_result={"output": "done"})
+        with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
+            result = runner.invoke(
+                app,
+                ["run", "my_workflow", "-i", '{"key": "val"}', "-u", "charlie"],
+            )
+        assert result.exit_code == 0
+        mock_platform.run_workflow.assert_awaited_once_with(
+            "my_workflow", {"key": "val"}, user_id="charlie"
+        )
 
     def test_run_invalid_json_input(self):
         result = runner.invoke(app, ["run", "my_workflow", "--input", "{bad json}"])

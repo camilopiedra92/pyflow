@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 def run(
     workflow_name: str = typer.Argument(help="Name of workflow to execute"),
     input_json: str = typer.Option("{}", "--input", "-i", help="JSON input for the workflow"),
+    user_id: str = typer.Option("default", "--user-id", "-u", help="User ID for session"),
     workflows_dir: str = typer.Option(
         "workflows", "--workflows-dir", "-w", help="Workflows directory"
     ),
@@ -35,7 +36,7 @@ def run(
     async def _run():
         await platform.boot()
         try:
-            result = await platform.run_workflow(workflow_name, input_data)
+            result = await platform.run_workflow(workflow_name, input_data, user_id=user_id)
             typer.echo(json.dumps(result, indent=2))
         finally:
             await platform.shutdown()
