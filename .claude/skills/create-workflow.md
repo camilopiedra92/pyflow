@@ -80,7 +80,7 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 
 **Instructions can reference state** with `{variable_name}` — resolved from session state at runtime.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, plus any custom tools in `pyflow/tools/`.
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus any custom tools in `pyflow/tools/`.
 
 ### Expr Agent — inline safe expression
 

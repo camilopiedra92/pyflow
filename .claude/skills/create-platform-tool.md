@@ -38,9 +38,11 @@ Follow this sequence. Each step has a corresponding section below.
 1. Create `pyflow/tools/<tool_name>.py`
 2. Create `tests/tools/test_<tool_name>.py` — write tests first (TDD)
 3. Implement the tool class
-4. Run tests: `source .venv/bin/activate && pytest tests/tools/test_<tool_name>.py -v`
-5. Run full suite: `pytest -v`
-6. Run linter: `ruff check`
+4. Register in `pyflow/tools/__init__.py` — add import + `__all__` entry
+5. Add `"<tool_name>" in tools` assertion to `tests/tools/test_base.py::TestGetRegisteredTools::test_includes_builtin_tools`
+6. Run tests: `source .venv/bin/activate && pytest tests/tools/test_<tool_name>.py -v`
+7. Run full suite: `pytest -v`
+8. Run linter: `ruff check`
 
 ## Step 1: Design the Tool Interface
 
@@ -123,6 +125,8 @@ Do NOT reimplement functionality that already exists. Import from the platform:
 | `is_private_url` | `from pyflow.tools.security import is_private_url` | SSRF protection — block requests to private/internal networks |
 | `_validate_ast` | `from pyflow.tools.condition import _validate_ast` | Validate Python expressions in AST sandbox |
 | `_SAFE_BUILTINS` | `from pyflow.tools.condition import _SAFE_BUILTINS` | Restricted builtins for sandboxed evaluation |
+| `get_secret` | `from pyflow.tools.base import get_secret` | Read secrets from env vars (`PYFLOW_{NAME}`) with dict fallback |
+| `set_secrets` / `clear_secrets` | `from pyflow.tools.base import set_secrets, clear_secrets` | Manage platform secrets dict (used in tests) |
 
 **`safe_json_parse(value, default=None)`** — Use this whenever a parameter accepts JSON strings:
 ```python
@@ -148,6 +152,43 @@ if is_private_url(url):
 - **No imports of user-provided module names** — that's what CodeAgent is for
 - **No shell commands with user input** — never pass user input to subprocess calls
 
+### Accessing Secrets (API Tokens)
+
+Tools that need API tokens or credentials use `get_secret(name)` from `pyflow.tools.base`. It checks the `PYFLOW_{NAME}` environment variable first (uppercased), then falls back to the platform secrets dict.
+
+```python
+from pyflow.tools.base import BasePlatformTool, get_secret
+
+class MyApiTool(BasePlatformTool):
+    name = "my_api"
+    description = "Call an external API."
+
+    async def execute(self, tool_context: ToolContext, query: str) -> dict:
+        token = get_secret("my_api_token")  # reads PYFLOW_MY_API_TOKEN env var
+        if not token:
+            return {"success": False, "error": "API token not configured. Set PYFLOW_MY_API_TOKEN."}
+        # ... use token in Authorization header
+```
+
+Users set secrets via environment variable or `.env` file:
+```bash
+# .env (gitignored)
+PYFLOW_MY_API_TOKEN=your-token-here
+```
+
+**In tests**, use `set_secrets()` and `clear_secrets()` for isolation:
+```python
+from pyflow.tools.base import clear_secrets, set_secrets
+
+class TestMyApiTool:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"my_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+```
+
 ### Auto-Registration Details
 
 Registration happens automatically when:
@@ -159,7 +200,11 @@ This means:
 - Setting `name = None` prevents registration (useful for test stubs and abstract subclasses)
 - The tool module just needs to be imported — PyFlow discovers all files in `pyflow/tools/` at boot
 
-No changes needed to any registry, `__init__.py`, or configuration file. Just create the file.
+You still need to add an import in `pyflow/tools/__init__.py` so the module gets imported at boot time and the auto-registration fires. Add:
+```python
+from pyflow.tools.my_tool import MyTool  # noqa: F401
+```
+And add `"MyTool"` to `__all__`.
 
 ## Step 3: Write Tests
 
@@ -270,13 +315,14 @@ ruff check                                     # lint clean
 
 ## Common Patterns
 
-### HTTP Client Tool
-If the tool wraps an external API, follow HttpTool's pattern:
+### HTTP API Client Tool
+If the tool wraps an external API (like YnabTool), follow this pattern:
 - Use `httpx.AsyncClient` with a timeout
-- Check `is_private_url()` before requesting
-- Clamp timeout to a sensible range
-- Parse response as JSON, fall back to text
-- Return `{"status": code, "body": data}` on success, `{"status": 0, "error": msg}` on failure
+- Use `get_secret("api_token")` for authentication — reads `PYFLOW_API_TOKEN` env var
+- Return early with error dict if token is missing
+- Parse response as JSON, check status code for API errors
+- Return `{"success": True, "data": {...}}` on success, `{"success": False, "error": msg}` on failure
+- See `pyflow/tools/ynab.py` as reference implementation (action-based dispatch, route table)
 
 ### Data Processing Tool
 If the tool transforms data (like TransformTool):
@@ -304,8 +350,8 @@ async def execute(self, tool_context: ToolContext, key: str) -> dict:
 
 ## What NOT To Do
 
-- **Don't add the tool to any registry manually** — `__init_subclass__` handles it
-- **Don't modify `__init__.py`** — tools are discovered by importing the module
+- **Don't add the tool to any registry manually** — `__init_subclass__` handles registration when the module is imported
+- **Do add the import to `pyflow/tools/__init__.py`** — this ensures the module gets imported at boot so auto-registration fires
 - **Don't use `**kwargs` on execute** — ADK needs explicit typed parameters to generate the schema
 - **Don't raise exceptions** — catch them and return error dicts
 - **Don't reimplement `safe_json_parse` or `is_private_url`** — import from `pyflow.tools.parsing` and `pyflow.tools.security`
