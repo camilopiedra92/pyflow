@@ -137,7 +137,7 @@ pyflow/
   models/
     workflow.py       -- WorkflowDef, OrchestrationConfig, A2AConfig
     agent.py          -- AgentConfig
-    tool.py           -- ToolMetadata, ToolConfig, ToolResponse
+    tool.py           -- ToolMetadata
     platform.py       -- PlatformConfig
   server.py           -- FastAPI server with REST + A2A endpoints
   cli.py              -- Typer CLI (run, validate, list, serve)

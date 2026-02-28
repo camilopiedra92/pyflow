@@ -46,7 +46,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
 - `pyflow/models/workflow.py` — WorkflowDef, AgentConfig, OrchestrationConfig, A2AConfig
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools ref)
-- `pyflow/models/tool.py` — ToolMetadata, ToolConfig base, ToolResponse base
+- `pyflow/models/tool.py` — ToolMetadata
 - `pyflow/models/platform.py` — PlatformConfig
 - `pyflow/cli.py` — Typer CLI (run, validate, list, serve)
 - `pyflow/server.py` — FastAPI server with REST + A2A endpoints
@@ -57,7 +57,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 ## Key Patterns
 
 - Tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__` — no manual registration needed
-- Each tool defines `name`, `description`, `config_model`, `response_model` class vars + async `execute()`
+- Each tool defines `name`, `description` class vars + async `execute()` with typed parameters
 - `as_function_tool()` converts any platform tool to an ADK `FunctionTool`
 - Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`), `orchestration`, and optional `a2a`
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees

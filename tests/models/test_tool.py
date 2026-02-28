@@ -1,36 +1,6 @@
 from __future__ import annotations
 
-from pyflow.models.tool import ToolConfig, ToolMetadata, ToolResponse
-
-
-class TestToolConfig:
-    def test_base_config_instantiation(self):
-        config = ToolConfig()
-        assert isinstance(config, ToolConfig)
-
-    def test_base_config_is_extensible(self):
-        class MyConfig(ToolConfig):
-            url: str
-            timeout: int = 30
-
-        cfg = MyConfig(url="https://example.com")
-        assert cfg.url == "https://example.com"
-        assert cfg.timeout == 30
-
-
-class TestToolResponse:
-    def test_base_response_instantiation(self):
-        resp = ToolResponse()
-        assert isinstance(resp, ToolResponse)
-
-    def test_base_response_is_extensible(self):
-        class MyResponse(ToolResponse):
-            status: int
-            body: str
-
-        resp = MyResponse(status=200, body="ok")
-        assert resp.status == 200
-        assert resp.body == "ok"
+from pyflow.models.tool import ToolMetadata
 
 
 class TestToolMetadata:

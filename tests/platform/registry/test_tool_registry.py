@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from typing import Any, ClassVar
-from unittest.mock import AsyncMock
 
 import pytest
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
-from pyflow.models.tool import ToolConfig, ToolMetadata, ToolResponse
+from pyflow.models.tool import ToolMetadata
 from pyflow.platform.registry.tool_registry import ToolRegistry
 from pyflow.tools.base import BasePlatformTool
 
@@ -15,24 +14,12 @@ from pyflow.tools.base import BasePlatformTool
 # -- Fixtures / helpers -------------------------------------------------------
 
 
-class _DummyConfig(ToolConfig):
-    value: str = "test"
-
-
-class _DummyResponse(ToolResponse):
-    result: str = "ok"
-
-
 class _DummyTool(BasePlatformTool):
     name: ClassVar[str] = "dummy_tool"
     description: ClassVar[str] = "A dummy tool for testing"
-    config_model: ClassVar[type[ToolConfig]] = _DummyConfig
-    response_model: ClassVar[type[ToolResponse]] = _DummyResponse
 
-    async def execute(
-        self, config: ToolConfig, tool_context: ToolContext | None = None
-    ) -> ToolResponse:
-        return _DummyResponse(result="executed")
+    async def execute(self, tool_context: ToolContext, **kwargs: Any) -> dict:
+        return {"result": "executed"}
 
 
 @pytest.fixture
