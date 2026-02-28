@@ -185,3 +185,253 @@ class TestWorkflowDef:
             ),
         )
         assert wf.description == ""
+
+    def test_workflow_def_default_runtime(self):
+        """Existing WorkflowDef should work with default RuntimeConfig."""
+        agents = self._make_agents()
+        wf = WorkflowDef(
+            name="with_default_runtime",
+            agents=agents,
+            orchestration=OrchestrationConfig(
+                type="sequential", agents=["fetcher", "analyzer"]
+            ),
+        )
+        assert wf.runtime is not None
+        assert wf.runtime.session_service == "in_memory"
+        assert wf.runtime.memory_service == "none"
+
+    def test_workflow_def_with_runtime(self):
+        """WorkflowDef with custom runtime config."""
+        agents = self._make_agents()
+        wf = WorkflowDef(
+            name="custom_runtime",
+            agents=agents,
+            orchestration=OrchestrationConfig(
+                type="sequential", agents=["fetcher", "analyzer"]
+            ),
+            runtime=RuntimeConfig(
+                session_service="sqlite",
+                session_db_url="sqlite+aiosqlite:///wf.db",
+                memory_service="in_memory",
+                artifact_service="file",
+                artifact_dir="./artifacts",
+            ),
+        )
+        assert wf.runtime.session_service == "sqlite"
+        assert wf.runtime.artifact_service == "file"
+
+    def test_orchestration_refs_dag_validates_node_agents(self):
+        """WorkflowDef validator checks dag node agent refs against defined agents."""
+        agents = self._make_agents()
+        with pytest.raises(ValidationError, match="unknown_agent"):
+            WorkflowDef(
+                name="bad_dag",
+                agents=agents,
+                orchestration=OrchestrationConfig(
+                    type="dag",
+                    nodes=[
+                        DagNode(agent="fetcher"),
+                        DagNode(agent="unknown_agent", depends_on=["fetcher"]),
+                    ],
+                ),
+            )
+
+    def test_orchestration_refs_react_validates_agent(self):
+        """WorkflowDef validator checks react agent ref against defined agents."""
+        agents = self._make_agents()
+        with pytest.raises(ValidationError, match="nonexistent"):
+            WorkflowDef(
+                name="bad_react",
+                agents=agents,
+                orchestration=OrchestrationConfig(
+                    type="react",
+                    agent="nonexistent",
+                ),
+            )
+
+    def test_orchestration_refs_llm_routed_validates_router(self):
+        """WorkflowDef validator checks llm_routed router ref against defined agents."""
+        agents = self._make_agents()
+        with pytest.raises(ValidationError, match="bad_router"):
+            WorkflowDef(
+                name="bad_routed",
+                agents=agents,
+                orchestration=OrchestrationConfig(
+                    type="llm_routed",
+                    router="bad_router",
+                    agents=["fetcher", "analyzer"],
+                ),
+            )
+
+    def test_orchestration_refs_llm_routed_validates_agents(self):
+        """WorkflowDef validator checks llm_routed agents refs against defined agents."""
+        agents = self._make_agents()
+        with pytest.raises(ValidationError, match="missing_agent"):
+            WorkflowDef(
+                name="bad_routed",
+                agents=agents,
+                orchestration=OrchestrationConfig(
+                    type="llm_routed",
+                    router="fetcher",
+                    agents=["missing_agent"],
+                ),
+            )
+
+    def test_workflow_dag_valid(self):
+        """WorkflowDef with valid dag orchestration passes all validation."""
+        agents = self._make_agents()
+        wf = WorkflowDef(
+            name="dag_wf",
+            agents=agents,
+            orchestration=OrchestrationConfig(
+                type="dag",
+                nodes=[
+                    DagNode(agent="fetcher"),
+                    DagNode(agent="analyzer", depends_on=["fetcher"]),
+                ],
+            ),
+        )
+        assert wf.orchestration.type == "dag"
+
+    def test_workflow_react_valid(self):
+        """WorkflowDef with valid react orchestration passes all validation."""
+        agents = self._make_agents()
+        wf = WorkflowDef(
+            name="react_wf",
+            agents=agents,
+            orchestration=OrchestrationConfig(
+                type="react",
+                agent="fetcher",
+            ),
+        )
+        assert wf.orchestration.type == "react"
+
+    def test_workflow_llm_routed_valid(self):
+        """WorkflowDef with valid llm_routed orchestration passes all validation."""
+        agents = self._make_agents()
+        wf = WorkflowDef(
+            name="routed_wf",
+            agents=agents,
+            orchestration=OrchestrationConfig(
+                type="llm_routed",
+                router="fetcher",
+                agents=["fetcher", "analyzer"],
+            ),
+        )
+        assert wf.orchestration.type == "llm_routed"
+
+
+class TestOrchestrationConfigExpanded:
+    """Tests for expanded orchestration types: react, dag, llm_routed."""
+
+    def test_react(self):
+        config = OrchestrationConfig(type="react", agent="reasoner", planner="plan_react")
+        assert config.type == "react"
+        assert config.agent == "reasoner"
+        assert config.planner == "plan_react"
+
+    def test_react_requires_agent(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="react")
+
+    def test_dag(self):
+        config = OrchestrationConfig(
+            type="dag",
+            nodes=[
+                DagNode(agent="a"),
+                DagNode(agent="b", depends_on=["a"]),
+            ],
+        )
+        assert config.type == "dag"
+        assert len(config.nodes) == 2
+
+    def test_dag_requires_nodes(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="dag")
+
+    def test_dag_detects_cycle(self):
+        with pytest.raises(ValidationError, match="cycle"):
+            OrchestrationConfig(
+                type="dag",
+                nodes=[
+                    DagNode(agent="a", depends_on=["b"]),
+                    DagNode(agent="b", depends_on=["a"]),
+                ],
+            )
+
+    def test_dag_detects_self_cycle(self):
+        with pytest.raises(ValidationError, match="cycle"):
+            OrchestrationConfig(
+                type="dag",
+                nodes=[DagNode(agent="a", depends_on=["a"])],
+            )
+
+    def test_dag_detects_three_node_cycle(self):
+        with pytest.raises(ValidationError, match="cycle"):
+            OrchestrationConfig(
+                type="dag",
+                nodes=[
+                    DagNode(agent="a", depends_on=["c"]),
+                    DagNode(agent="b", depends_on=["a"]),
+                    DagNode(agent="c", depends_on=["b"]),
+                ],
+            )
+
+    def test_dag_unknown_dependency(self):
+        with pytest.raises(ValidationError, match="Unknown dependency"):
+            OrchestrationConfig(
+                type="dag",
+                nodes=[DagNode(agent="a", depends_on=["nonexistent"])],
+            )
+
+    def test_dag_valid_diamond(self):
+        """Diamond-shaped DAG (a -> b, a -> c, b -> d, c -> d) is acyclic."""
+        config = OrchestrationConfig(
+            type="dag",
+            nodes=[
+                DagNode(agent="a"),
+                DagNode(agent="b", depends_on=["a"]),
+                DagNode(agent="c", depends_on=["a"]),
+                DagNode(agent="d", depends_on=["b", "c"]),
+            ],
+        )
+        assert len(config.nodes) == 4
+
+    def test_llm_routed(self):
+        config = OrchestrationConfig(
+            type="llm_routed", router="dispatcher", agents=["a", "b"]
+        )
+        assert config.type == "llm_routed"
+        assert config.router == "dispatcher"
+
+    def test_llm_routed_requires_router_and_agents(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="llm_routed", router="dispatcher")
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="llm_routed", agents=["a"])
+
+    def test_loop_with_max_iterations(self):
+        config = OrchestrationConfig(type="loop", agents=["a", "b"], max_iterations=5)
+        assert config.max_iterations == 5
+
+    def test_sequential_still_works(self):
+        config = OrchestrationConfig(type="sequential", agents=["a", "b"])
+        assert config.type == "sequential"
+        assert config.agents == ["a", "b"]
+
+    def test_parallel_still_works(self):
+        config = OrchestrationConfig(type="parallel", agents=["a", "b"])
+        assert config.type == "parallel"
+        assert config.agents == ["a", "b"]
+
+    def test_sequential_requires_agents(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="sequential")
+
+    def test_parallel_requires_agents(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="parallel")
+
+    def test_loop_requires_agents(self):
+        with pytest.raises(ValidationError):
+            OrchestrationConfig(type="loop")
