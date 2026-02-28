@@ -106,7 +106,8 @@ class PyFlowPlatform:
         log.info("workflows.discovered", count=len(self.workflows))
 
         # 3. Hydrate workflows (resolve tool refs -> ADK agents)
-        self.workflows.hydrate(self.tools)
+        # project_root = parent of workflows_dir (for resolving shared spec paths)
+        self.workflows.hydrate(self.tools, project_root=workflows_path.parent)
         log.info("workflows.hydrated")
 
         # 4. Generate A2A agent cards from workflows with a2a: section

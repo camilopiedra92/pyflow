@@ -73,7 +73,9 @@ async def test_boot_lifecycle() -> None:
 
     p.tools.discover.assert_called_once()
     p.workflows.discover.assert_called_once_with(Path(p.config.workflows_dir))
-    p.workflows.hydrate.assert_called_once_with(p.tools)
+    p.workflows.hydrate.assert_called_once_with(
+        p.tools, project_root=Path(p.config.workflows_dir).parent
+    )
 
 
 @pytest.mark.asyncio

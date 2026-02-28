@@ -60,12 +60,13 @@ class WorkflowRegistry:
         """Return all hydrated workflow entries."""
         return list(self._workflows.values())
 
-    def hydrate(self, tool_registry: ToolRegistry) -> None:
+    def hydrate(self, tool_registry: ToolRegistry, project_root: Path | None = None) -> None:
         """Hydrate all workflows by converting WorkflowDefs into ADK agent trees."""
         from pyflow.platform.hydration.hydrator import WorkflowHydrator
 
         for hw in self._workflows.values():
-            hydrator = WorkflowHydrator(tool_registry, base_dir=hw.package_dir)
+            base = project_root or hw.package_dir
+            hydrator = WorkflowHydrator(tool_registry, base_dir=base)
             hw.agent = hydrator.hydrate(hw.definition)
 
     def __len__(self) -> int:

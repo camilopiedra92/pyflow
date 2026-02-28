@@ -164,9 +164,12 @@ class TestHydratorOpenApiTools:
 
 
 class TestBuildRootAgentOpenApi:
-    def test_build_root_agent_passes_base_dir(self, tmp_path):
-        """build_root_agent should derive base_dir from caller_file's parent."""
-        workflow_yaml = tmp_path / "workflow.yaml"
+    def test_build_root_agent_passes_project_root(self, tmp_path):
+        """build_root_agent should derive base_dir as project root (grandparent of package)."""
+        # Simulate: project_root/agents/my_agent/workflow.yaml
+        pkg_dir = tmp_path / "agents" / "my_agent"
+        pkg_dir.mkdir(parents=True)
+        workflow_yaml = pkg_dir / "workflow.yaml"
         workflow_yaml.write_text(
             "name: test\n"
             "agents:\n"
@@ -178,7 +181,7 @@ class TestBuildRootAgentOpenApi:
             "  type: react\n"
             "  agent: a1\n"
         )
-        agent_py = tmp_path / "agent.py"
+        agent_py = pkg_dir / "agent.py"
         agent_py.write_text("")
 
         with patch(
@@ -193,6 +196,7 @@ class TestBuildRootAgentOpenApi:
             build_root_agent(str(agent_py))
 
         call_kwargs = MockHydrator.call_args
+        # base_dir should be tmp_path (project root = grandparent of agent package)
         assert call_kwargs.kwargs.get("base_dir") == tmp_path or (
             len(call_kwargs.args) > 1 and call_kwargs.args[1] == tmp_path
         )

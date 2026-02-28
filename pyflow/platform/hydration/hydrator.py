@@ -400,8 +400,10 @@ def build_root_agent(caller_file: str) -> BaseAgent:
 
     workflow_dir = Path(caller_file).parent
     workflow_path = workflow_dir / "workflow.yaml"
+    # project_root = grandparent of agent package (agents/<name>/ -> project root)
+    project_root = workflow_dir.parent.parent
     tools = ToolRegistry()
     tools.discover()
     workflow = WorkflowDef.from_yaml(workflow_path)
-    hydrator = WorkflowHydrator(tools, base_dir=workflow_dir)
+    hydrator = WorkflowHydrator(tools, base_dir=project_root)
     return hydrator.hydrate(workflow)
