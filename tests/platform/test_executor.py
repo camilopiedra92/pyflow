@@ -61,6 +61,7 @@ class TestRun:
         mock_event.author = "agent"
 
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -80,6 +81,7 @@ class TestRun:
     async def test_empty_response(self):
         executor = WorkflowExecutor()
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -97,6 +99,7 @@ class TestRun:
     async def test_default_user_id(self):
         executor = WorkflowExecutor()
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -156,6 +159,7 @@ class TestDatetimeState:
     async def test_session_created_with_datetime_state(self):
         executor = WorkflowExecutor(tz_name="UTC")
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -266,6 +270,7 @@ class TestRunMetrics:
         mock_event.author = "agent"
 
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -282,7 +287,7 @@ class TestRunMetrics:
     async def test_run_empty_response_still_has_usage(self):
         executor = WorkflowExecutor()
         mock_runner = MagicMock()
-        mock_runner.plugins = None
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)

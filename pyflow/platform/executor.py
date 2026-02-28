@@ -96,9 +96,7 @@ class WorkflowExecutor:
     ) -> RunResult:
         """Execute a workflow and collect results."""
         metrics = MetricsPlugin()
-        if runner.plugins is None:
-            runner.plugins = []
-        runner.plugins.append(metrics)
+        runner.plugin_manager.plugins.append(metrics)
 
         try:
             state = self._datetime_state()
@@ -149,7 +147,7 @@ class WorkflowExecutor:
                 session_id=session.id,
             )
         finally:
-            runner.plugins.remove(metrics)
+            runner.plugin_manager.plugins.remove(metrics)
 
     async def run_streaming(
         self,
