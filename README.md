@@ -4,7 +4,7 @@
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Tests: 539 passing](https://img.shields.io/badge/tests-539%20passing-brightgreen)
+![Tests: 560 passing](https://img.shields.io/badge/tests-560%20passing-brightgreen)
 ![Google ADK](https://img.shields.io/badge/powered%20by-Google%20ADK-4285F4)
 
 PyFlow is an agent platform that turns YAML workflow definitions into [Google ADK](https://google.github.io/adk-docs/) agent trees. Tools self-register at boot, agents compose into pipelines (sequential, parallel, loop, DAG), and the [A2A protocol](https://google.github.io/A2A/) makes every workflow discoverable by other agents.
@@ -36,12 +36,12 @@ PyFlow is an agent platform that turns YAML workflow definitions into [Google AD
 - **A2A agent cards** — auto-generated from the `a2a:` section in workflow YAML; opt-in per workflow
 - **REST + A2A server** — FastAPI server exposes both REST endpoints and A2A protocol
 - **MCP tools** — connect to Model Context Protocol servers via `mcp_servers` in runtime config
-- **OpenAPI tools** — auto-generate tools from OpenAPI specs via `openapi_tools` on agent config (ADK `OpenAPIToolset`)
+- **OpenAPI tools** — declare OpenAPI specs at the workflow level and reference by name via `tools: [ynab]` (ADK `OpenAPIToolset`)
 
 ### Developer Experience
 
 - **CLI** — `pyflow run`, `validate`, `list`, `init`, `serve`
-- **539 tests** across 45 test files — fully mocked, no real network or LLM calls
+- **560 tests** across 47 test files — fully mocked, no real network or LLM calls
 - **Fully typed** — Pydantic v2 models for all configs, responses, and workflow definitions
 - **Structured logging** — structlog with ISO timestamps
 - **OpenTelemetry** — opt-in tracing and metrics via platform telemetry config
@@ -311,7 +311,7 @@ pyflow/
     app.py                    # PyFlowPlatform orchestrator (boot/shutdown lifecycle)
     executor.py               # WorkflowExecutor (ADK App model, builds Runner per-run, datetime state injection)
     registry/
-      tool_registry.py        # Auto-discover + register tools
+      tool_registry.py        # Auto-discover + register tools (custom + OpenAPI)
       workflow_registry.py    # Discover + hydrate YAML workflows
       discovery.py            # Filesystem scanner for agent packages
     hydration/
@@ -329,9 +329,10 @@ pyflow/
     condition.py              # ConditionTool (AST-validated safe eval)
     alert.py                  # AlertTool (webhook notifications)
     storage.py                # StorageTool (JSON file read/write/append)
+    openapi_auth.py           # resolve_openapi_auth: OpenAPI auth config → ADK auth scheme/credential
   models/
-    workflow.py               # WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
-    agent.py                  # AgentConfig (model, instruction, tools, schemas, generation config, openapi_tools), OpenApiAuthConfig, OpenApiToolConfig
+    workflow.py               # WorkflowDef (with openapi_tools), OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
+    agent.py                  # AgentConfig (model, instruction, tools, schemas, generation config), OpenApiAuthConfig, OpenApiToolConfig
     tool.py                   # ToolMetadata
     platform.py               # PlatformConfig (pydantic-settings BaseSettings, telemetry config)
   server.py                   # FastAPI server with REST + A2A endpoints
@@ -339,9 +340,9 @@ pyflow/
   config.py                   # structlog configuration
 agents/
   exchange_tracker/           # 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
-  budget_analyst/             # ReAct agent with BuiltInPlanner and YNAB OpenAPI tools
+  budget_analyst/             # ReAct agent with PlanReAct planner, YNAB via tools: [ynab]
   example/                    # Simple sequential workflow (condition + transform)
-tests/                        # 539 tests across 45 files, mirrors source structure
+tests/                        # 560 tests across 47 files, mirrors source structure
 ```
 
 ### Platform Boot Sequence
@@ -352,6 +353,7 @@ boot()
   ├─ set_secrets()          # Inject config.secrets into tool secret store
   ├─ tools.discover()       # Scan tools/, auto-register via __init_subclass__
   ├─ workflows.discover()   # Scan agents/, discover packages
+  ├─ register_openapi()     # Pre-build OpenAPIToolset from workflow-level specs
   └─ workflows.hydrate()    # Resolve tool refs → build ADK agent trees
       └─ ready
 
@@ -435,7 +437,7 @@ ruff format .
 
 ### Testing
 
-- **539 tests** across 45 test files
+- **560 tests** across 47 test files
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
 - Server tests use `httpx.ASGITransport` for in-process FastAPI testing

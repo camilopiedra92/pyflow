@@ -334,8 +334,11 @@ def build_root_agent(caller_file: str) -> BaseAgent:
     project_root = workflow_dir.parent.parent
     tools = ToolRegistry()
     tools.discover()
+    from pyflow.models.project import ProjectConfig
+
     workflow = WorkflowDef.from_yaml(workflow_path)
-    if workflow.openapi_tools:
-        tools.register_openapi_tools(workflow.openapi_tools, project_root)
+    project_config = ProjectConfig.from_yaml(project_root / "pyflow.yaml")
+    if project_config.openapi_tools:
+        tools.register_openapi_tools(project_config.openapi_tools, project_root)
     hydrator = WorkflowHydrator(tools)
     return hydrator.hydrate(workflow)

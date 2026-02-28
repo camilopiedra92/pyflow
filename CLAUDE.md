@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 539 tests
+- `pytest -v` — run all 576 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -56,11 +56,12 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
 - `pyflow/platform/openapi_auth.py` — resolve_openapi_auth: OpenAPI auth config to ADK auth scheme/credential
-- `pyflow/models/workflow.py` — WorkflowDef (with openapi_tools), OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
+- `pyflow/models/project.py` — ProjectConfig: project-level config loaded from `pyflow.yaml` (openapi_tools)
+- `pyflow/models/workflow.py` — WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools), OpenApiAuthConfig, OpenApiToolConfig
 - `pyflow/models/tool.py` — ToolMetadata
-- `pyflow/platform/callbacks.py` — FQN-based callback resolution via `importlib` (Python dotted paths like `mypackage.callbacks.log_request`)
+- `pyflow/platform/callbacks.py` — FQN-based callback + tool predicate resolution via `importlib` (Python dotted paths like `mypackage.callbacks.log_request`)
 - `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone, cors_origins, telemetry)
 - `pyflow/cli.py` — Typer CLI (run, validate, list, init, serve)
 - `pyflow/server.py` — FastAPI server with REST + A2A endpoints + optional CORS middleware
@@ -73,7 +74,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__` — no manual registration needed
 - Each tool defines `name`, `description` class vars + async `execute()` with typed parameters
 - `as_function_tool()` converts any platform tool to an ADK `FunctionTool`
-- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`, plus optional `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`), `orchestration`, optional `openapi_tools` (workflow-level dict of named OpenAPI specs), and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
+- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`, plus optional `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`), `orchestration`, and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
 - `expr` agents evaluate safe Python expressions inline (AST-validated, restricted builtins, no imports/IO) — reuses sandbox from ConditionTool
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees
 - Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm (lazy-loaded via `@lru_cache`)
@@ -95,7 +96,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Executor injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session state
 - Executor wraps agent in ADK `App` model (`Runner(app=app)` instead of `Runner(agent=agent)`) — unlocks context caching, event compaction, resumability, app-level plugins
 - RuntimeConfig supports `context_cache_intervals/ttl/min_tokens` (Gemini 2.0+ context caching), `compaction_interval/overlap` (long conversation compaction), `resumable` (session resumability), `credential_service` (`in_memory` or `none`), `session_db_path` (SQLite path), `mcp_servers` (MCP server connections)
-- `openapi_tools` on WorkflowDef: workflow-level dict of named OpenAPI specs with auth; ToolRegistry pre-builds `OpenAPIToolset` instances at boot, agents reference by name via `tools: [ynab]`
+- `openapi_tools` in `pyflow.yaml`: project-level dict of named OpenAPI specs with auth; loaded by `ProjectConfig.from_yaml()` during `boot()` and `build_root_agent()`; ToolRegistry pre-builds `OpenAPIToolset` instances, agents reference by name via `tools: [ynab]`; optional `tool_filter` field (`list[str]` for static whitelist, `str` FQN for `ToolPredicate` callable) filters operations via ADK `tool_filter`
 - Callbacks resolved via Python FQN (fully-qualified names) through `importlib` — e.g. `before_agent: "mypackage.callbacks.log_request"`. No manual registry needed
 - Plugin registry includes 7 ADK plugins: `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics` (requires `PYFLOW_BQ_PROJECT_ID`/`PYFLOW_BQ_DATASET_ID` env vars)
 - CORS middleware opt-in via `PlatformConfig.cors_origins` (env: `PYFLOW_CORS_ORIGINS`)
@@ -112,7 +113,7 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `buil
 
 ## Testing
 
-- 539 tests across 45 test files
+- 576 tests across 49 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`

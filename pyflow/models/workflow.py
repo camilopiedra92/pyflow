@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 
-from pyflow.models.agent import AgentConfig, OpenApiToolConfig
+from pyflow.models.agent import AgentConfig
 
 
 class SkillDef(BaseModel):
@@ -157,7 +157,6 @@ class WorkflowDef(BaseModel):
     description: str = ""
     agents: list[AgentConfig]
     orchestration: OrchestrationConfig
-    openapi_tools: dict[str, OpenApiToolConfig] = Field(default_factory=dict)
     a2a: A2AConfig | None = None
     runtime: RuntimeConfig = RuntimeConfig()
 

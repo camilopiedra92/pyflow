@@ -105,7 +105,7 @@ class TestBuildRootAgentOpenApi:
         )
 
     def test_build_root_agent_registers_openapi_tools(self, tmp_path):
-        """build_root_agent registers workflow-level openapi_tools before hydration."""
+        """build_root_agent registers openapi_tools from pyflow.yaml before hydration."""
         pkg_dir = tmp_path / "agents" / "my_agent"
         pkg_dir.mkdir(parents=True)
         workflow_yaml = pkg_dir / "workflow.yaml"
@@ -117,15 +117,20 @@ class TestBuildRootAgentOpenApi:
             "    model: gemini-2.5-flash\n"
             "    instruction: hi\n"
             "    tools: [ynab]\n"
-            "openapi_tools:\n"
-            "  ynab:\n"
-            "    spec: specs/test.yaml\n"
             "orchestration:\n"
             "  type: react\n"
             "  agent: a1\n"
         )
         agent_py = pkg_dir / "agent.py"
         agent_py.write_text("")
+
+        # Create pyflow.yaml at project root (grandparent of agent package)
+        pyflow_yaml = tmp_path / "pyflow.yaml"
+        pyflow_yaml.write_text(
+            "openapi_tools:\n"
+            "  ynab:\n"
+            "    spec: specs/test.yaml\n"
+        )
 
         with (
             patch(
@@ -149,7 +154,7 @@ class TestBuildRootAgentOpenApi:
         assert "ynab" in configs
 
     def test_build_root_agent_skips_when_no_openapi(self, tmp_path):
-        """build_root_agent does not call register_openapi_tools when none defined."""
+        """build_root_agent does not call register_openapi_tools when no pyflow.yaml."""
         pkg_dir = tmp_path / "agents" / "my_agent"
         pkg_dir.mkdir(parents=True)
         workflow_yaml = pkg_dir / "workflow.yaml"
@@ -166,6 +171,8 @@ class TestBuildRootAgentOpenApi:
         )
         agent_py = pkg_dir / "agent.py"
         agent_py.write_text("")
+
+        # No pyflow.yaml at project root
 
         with (
             patch(

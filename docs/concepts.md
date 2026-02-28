@@ -494,32 +494,81 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 
 ### OpenAPI Tools
 
-LLM agents can declare OpenAPI specs via `openapi_tools` to auto-generate tools from any OpenAPI/Swagger specification. The hydrator creates an ADK `OpenAPIToolset` at hydration time and injects the generated tools into the agent.
+OpenAPI specs are defined at the project level in `pyflow.yaml`, not in individual workflow YAML files. Each spec is registered by name in the `ToolRegistry` at boot, and agents reference them like any other tool via `tools: [name]`.
 
-**Agent-level config:**
+**Project-level config (`pyflow.yaml` at project root):**
 
 ```yaml
-- name: budget_assistant
-  type: llm
-  model: gemini-2.5-flash
-  instruction: "Help the user manage their budget"
-  openapi_tools:
-    - spec: specs/ynab-v1-openapi.yaml
-      auth:
-        type: bearer
-        token_env: PYFLOW_YNAB_API_TOKEN
-  output_key: budget_info
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
 ```
+
+**Agent usage (in `workflow.yaml`):**
+
+```yaml
+agents:
+  - name: analyst
+    type: llm
+    model: gemini-2.5-flash
+    instruction: "Help the user manage their budget"
+    tools: [ynab]
+    output_key: budget_info
+```
+
+The agent doesn't know it's backed by an OpenAPI spec — it just uses `ynab` like any other tool name. The `ToolRegistry` handles the 4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
+
+**Filtering operations:** Large OpenAPI specs can expose dozens of operations. Use `tool_filter` to limit which operations your agent sees — reduces token usage by limiting the tool schemas sent to the LLM.
+
+**Static list** — whitelist specific operation names:
+
+```yaml
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
+    tool_filter:
+      - get_budgets
+      - get_categories
+      - get_transactions_by_month
+```
+
+**Dynamic predicate** — Python FQN resolving to a `ToolPredicate` callable `(tool, readonly_context) -> bool`:
+
+```yaml
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
+    tool_filter: mypackage.predicates.budget_read_only
+```
+
+```python
+# mypackage/predicates.py
+def budget_read_only(tool, readonly_context):
+    """Only expose GET operations."""
+    return tool.name.startswith("get_")
+```
+
+Without `tool_filter`, all operations from the spec are available (default). Operation names are snake_case versions of the `operationId` in the spec. FQN predicates are resolved at boot via `importlib` — bad FQNs fail fast with `ModuleNotFoundError` or `TypeError`.
 
 **Auth types:**
 
 | Type | Fields | Description |
 |------|--------|-------------|
 | `bearer` | `token_env` | Bearer token from env var |
-| `api_key` | `token_env`, `header_name` | API key in a custom header (defaults to `X-API-Key`) |
-| *(none)* | — | No authentication |
+| `apikey` | `token_env`, `apikey_location`, `apikey_name` | API key in header or query param |
+| `oauth2` | `authorization_url`, `token_url`, `scopes`, `client_id_env`, `client_secret_env` | OAuth 2.0 authorization code flow |
+| `none` *(default)* | — | No authentication |
 
-Each operation in the OpenAPI spec becomes a callable tool injected into the agent. The spec path is resolved relative to the workflow YAML file.
+Each operation in the OpenAPI spec becomes a callable tool. The spec path is resolved relative to the project root (parent of the `agents/` directory).
 
 ---
 
@@ -560,7 +609,7 @@ Any Python callable can be referenced as a tool using its dotted module path. Th
 tools: [http_request, mypackage.tools.custom_search]
 ```
 
-Resolution order: custom platform tools > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`.
+Resolution order: custom platform tools > OpenAPI toolsets > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`.
 
 ### Creating Custom Tools
 
@@ -1065,11 +1114,6 @@ agents:                              # required, list of agent configs
     top_p: 0.95                      # optional
     top_k: 40                        # optional
     agent_tools: [other_agent]       # optional, wraps agents as callable tools
-    openapi_tools:                   # optional, OpenAPI specs -> auto-generated tools
-      - spec: "specs/api.yaml"
-        auth:
-          type: bearer
-          token_env: PYFLOW_API_TOKEN
     callbacks:
       before_agent: mypackage.callbacks.fn  # Python FQN
       after_agent: mypackage.callbacks.fn

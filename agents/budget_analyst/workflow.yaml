@@ -5,13 +5,6 @@
 name: budget_analyst
 description: "Personal budget analyst powered by YNAB — answers natural language questions about your finances"
 
-openapi_tools:
-  ynab:
-    spec: specs/ynab-v1-openapi.yaml
-    auth:
-      type: bearer
-      token_env: PYFLOW_YNAB_API_TOKEN
-
 agents:
   - name: analyst
     type: llm

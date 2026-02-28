@@ -9,6 +9,7 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.exit_loop_tool import exit_loop
 
 from pyflow.models.tool import ToolMetadata
+from pyflow.platform.callbacks import resolve_tool_predicate
 from pyflow.platform.openapi_auth import resolve_openapi_auth
 from pyflow.tools.base import BasePlatformTool
 
@@ -90,6 +91,11 @@ class ToolRegistry:
                 kwargs["auth_scheme"] = auth_scheme
             if auth_credential is not None:
                 kwargs["auth_credential"] = auth_credential
+            if cfg.tool_filter is not None:
+                if isinstance(cfg.tool_filter, list):
+                    kwargs["tool_filter"] = cfg.tool_filter
+                else:
+                    kwargs["tool_filter"] = resolve_tool_predicate(cfg.tool_filter)
             self._openapi_tools[name] = OpenAPIToolset(**kwargs)
 
     def get(self, name: str) -> BasePlatformTool:

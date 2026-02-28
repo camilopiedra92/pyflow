@@ -28,6 +28,7 @@ class OpenApiToolConfig(BaseModel):
     spec: str
     name_prefix: str | None = None
     auth: OpenApiAuthConfig = OpenApiAuthConfig()
+    tool_filter: list[str] | str | None = None
 
 
 class AgentConfig(BaseModel):

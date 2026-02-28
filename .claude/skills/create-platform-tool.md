@@ -321,13 +321,14 @@ ruff check                                     # lint clean
 ## Common Patterns
 
 ### HTTP API Client Tool
-If the tool wraps an external API (like YnabTool), follow this pattern:
+If the tool wraps an external API, follow this pattern:
 - Use `httpx.AsyncClient` with a timeout
 - Use `get_secret("api_token")` for authentication — reads `PYFLOW_API_TOKEN` env var
 - Return early with error dict if token is missing
 - Parse response as JSON, check status code for API errors
 - Return `{"success": True, "data": {...}}` on success, `{"success": False, "error": msg}` on failure
-- See `pyflow/tools/ynab.py` as reference implementation (action-based dispatch, route table)
+- See `pyflow/tools/http.py` as reference implementation
+- **Alternative:** For APIs with an OpenAPI spec, use workflow-level `openapi_tools` instead of writing a custom tool — the ToolRegistry auto-generates tools from the spec at boot
 
 ### Data Processing Tool
 If the tool transforms data (like TransformTool):

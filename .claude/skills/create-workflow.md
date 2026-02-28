@@ -105,7 +105,7 @@ callbacks:
 
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (see below), plus any custom tools in `pyflow/tools/`, plus any Python callable via FQN (e.g. `mypackage.tools.custom_search`).
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, plus ADK built-ins (see below), plus workflow-level OpenAPI tools (see below), plus any custom tools in `pyflow/tools/`, plus any Python callable via FQN (e.g. `mypackage.tools.custom_search`).
 
 **ADK built-in tools** (available by name in `tools:` list):
 
@@ -588,7 +588,20 @@ orchestration:
 
 A single LLM agent that autonomously decides which tool calls to make. Uses PlanReAct for structured multi-step reasoning.
 
+OpenAPI tools are defined in `pyflow.yaml` at the project root, not in the workflow YAML. Agents just reference them by name via `tools: [ynab]`.
+
 ```yaml
+# pyflow.yaml (project root) — defines the tool
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
+```
+
+```yaml
+# agents/budget_analyst/workflow.yaml — uses the tool by name
 name: budget_analyst
 description: "Answer questions about your YNAB budget"
 
@@ -600,8 +613,7 @@ agents:
       You are a budget analyst.
       Start by calling list_budgets, then query as needed.
       NEVER call list_transactions without since_date.
-    tools:
-      - ynab
+    tools: [ynab]
     output_key: analysis
 
 orchestration:

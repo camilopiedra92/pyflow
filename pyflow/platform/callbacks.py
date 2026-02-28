@@ -15,3 +15,17 @@ def resolve_callback(fqn: str | None) -> Callable | None:
     module_path, obj_name = fqn.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, obj_name)
+
+
+def resolve_tool_predicate(fqn: str) -> Callable:
+    """Resolve a fully-qualified Python name to a callable tool predicate.
+
+    Unlike resolve_callback, this raises TypeError if the resolved object
+    is not callable — ADK's tool_filter requires a ToolPredicate callable.
+    """
+    module_path, obj_name = fqn.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    obj = getattr(module, obj_name)
+    if not callable(obj):
+        raise TypeError(f"tool_filter '{fqn}' is not callable")
+    return obj

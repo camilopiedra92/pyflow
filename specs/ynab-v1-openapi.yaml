@@ -3517,7 +3517,6 @@ components:
         - green
         - blue
         - purple
-        - ""
         - null
     TransactionFlagName:
       type:

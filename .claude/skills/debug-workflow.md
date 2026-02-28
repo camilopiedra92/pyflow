@@ -169,7 +169,7 @@ pyflow list --tools
 ```
 
 Check:
-1. Is the tool name spelled correctly? Available: `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab` (plus any custom tools)
+1. Is the tool name spelled correctly? Available: `http_request`, `transform`, `condition`, `alert`, `storage` (plus workflow-level OpenAPI tools and any custom tools)
 2. If it's a custom tool, does the file exist in `pyflow/tools/`?
 3. Does the custom tool class have `name = "exact_name"` as a class-level string?
 4. Is the tool module importable? Try: `python -c "import pyflow.tools.<module_name>"`
@@ -338,7 +338,7 @@ Platform tools:
   condition              — Safe boolean expression evaluation
   alert                  — Webhook notifications
   storage                — Local file read/write/append
-  ynab                   — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+  (+ workflow-level OpenAPI tools, e.g. ynab via openapi_tools: in YAML)
 
 ADK built-in tools:
   exit_loop              — Signal loop completion
