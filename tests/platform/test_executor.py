@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pyflow.models.runner import RunResult
+from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.workflow import RuntimeConfig
 from pyflow.platform.executor import WorkflowExecutor, _detect_system_timezone
 
@@ -59,9 +59,9 @@ class TestRun:
         mock_event.is_final_response.return_value = True
         mock_event.content.parts = [MagicMock(text="Hello")]
         mock_event.author = "agent"
-        mock_event.usage_metadata = {"tokens": 100}
 
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -76,10 +76,12 @@ class TestRun:
         assert result.content == "Hello"
         assert result.session_id == "sess-1"
         assert result.author == "agent"
+        assert result.usage is not None
 
     async def test_empty_response(self):
         executor = WorkflowExecutor()
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -97,6 +99,7 @@ class TestRun:
     async def test_default_user_id(self):
         executor = WorkflowExecutor()
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -156,6 +159,7 @@ class TestDatetimeState:
     async def test_session_created_with_datetime_state(self):
         executor = WorkflowExecutor(tz_name="UTC")
         mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
         mock_session = MagicMock()
         mock_session.id = "sess-1"
         mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
@@ -255,3 +259,46 @@ class TestRunStreaming:
 
         mock_runner.session_service.get_session.assert_called_once()
         mock_runner.session_service.create_session.assert_called_once()
+
+
+class TestRunMetrics:
+    async def test_run_returns_usage_summary(self):
+        executor = WorkflowExecutor()
+        mock_event = MagicMock()
+        mock_event.is_final_response.return_value = True
+        mock_event.content.parts = [MagicMock(text="Hello")]
+        mock_event.author = "agent"
+
+        mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
+        mock_session = MagicMock()
+        mock_session.id = "sess-1"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            yield mock_event
+
+        mock_runner.run_async = fake_run
+
+        result = await executor.run(mock_runner, message="hi")
+        assert result.usage is not None
+        assert isinstance(result.usage, UsageSummary)
+
+    async def test_run_empty_response_still_has_usage(self):
+        executor = WorkflowExecutor()
+        mock_runner = MagicMock()
+        mock_runner.plugin_manager.plugins = []
+        mock_session = MagicMock()
+        mock_session.id = "sess-1"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            return
+            yield
+
+        mock_runner.run_async = fake_run
+
+        result = await executor.run(mock_runner, message="hi")
+        assert result.usage is not None
+        assert result.usage.steps == 0
+        assert result.usage.duration_ms >= 0

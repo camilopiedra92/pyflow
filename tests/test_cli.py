@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typer.testing import CliRunner
 
 from pyflow.cli import app
+from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 
@@ -189,3 +190,24 @@ class TestInitCommand:
         agent_py = (tmp_path / "test_agent" / "agent.py").read_text()
         assert "build_root_agent" in agent_py
         assert "root_agent = build_root_agent(__file__)" in agent_py
+
+
+class TestRunUsageOutput:
+    def test_run_shows_usage_summary(self):
+        usage = UsageSummary(
+            input_tokens=500,
+            output_tokens=100,
+            total_tokens=600,
+            duration_ms=2500,
+            steps=4,
+            llm_calls=2,
+            tool_calls=1,
+            model="gemini-2.5-flash",
+        )
+        result = RunResult(content="answer", author="agent", usage=usage)
+        mock_platform = _make_mock_platform(run_result=result)
+        with patch("pyflow.cli.PyFlowPlatform", return_value=mock_platform):
+            res = runner.invoke(app, ["run", "my_workflow"])
+        assert res.exit_code == 0
+        assert "500" in res.stdout
+        assert "100" in res.stdout

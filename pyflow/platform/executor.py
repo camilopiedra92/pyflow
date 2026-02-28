@@ -17,6 +17,7 @@ logging.getLogger("google_genai.types").setLevel(logging.ERROR)
 
 from pyflow.models.runner import RunResult
 from pyflow.models.workflow import RuntimeConfig
+from pyflow.platform.metrics_plugin import MetricsPlugin
 from pyflow.platform.plugins import resolve_plugins
 
 
@@ -94,54 +95,59 @@ class WorkflowExecutor:
         session_id: str | None = None,
     ) -> RunResult:
         """Execute a workflow and collect results."""
-        state = self._datetime_state()
-        if session_id:
-            session = await runner.session_service.get_session(
-                app_name=self._app_name,
-                user_id=user_id,
-                session_id=session_id,
-            )
-            if session is None:
+        metrics = MetricsPlugin()
+        runner.plugin_manager.plugins.append(metrics)
+
+        try:
+            state = self._datetime_state()
+            if session_id:
+                session = await runner.session_service.get_session(
+                    app_name=self._app_name,
+                    user_id=user_id,
+                    session_id=session_id,
+                )
+                if session is None:
+                    session = await runner.session_service.create_session(
+                        app_name=self._app_name,
+                        user_id=user_id,
+                        state=state,
+                    )
+            else:
                 session = await runner.session_service.create_session(
                     app_name=self._app_name,
                     user_id=user_id,
                     state=state,
                 )
-        else:
-            session = await runner.session_service.create_session(
-                app_name=self._app_name,
-                user_id=user_id,
-                state=state,
+
+            content = types.Content(
+                role="user",
+                parts=[types.Part(text=message)],
             )
 
-        content = types.Content(
-            role="user",
-            parts=[types.Part(text=message)],
-        )
+            final_event = None
+            async for event in runner.run_async(
+                user_id=user_id,
+                session_id=session.id,
+                new_message=content,
+            ):
+                if event.is_final_response() and event.content:
+                    final_event = event
 
-        final_event = None
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=session.id,
-            new_message=content,
-        ):
-            if event.is_final_response() and event.content:
-                final_event = event
+            if final_event and final_event.content and final_event.content.parts:
+                text = "".join(p.text for p in final_event.content.parts if p.text)
+            else:
+                text = ""
 
-        if final_event and final_event.content and final_event.content.parts:
-            text = "".join(p.text for p in final_event.content.parts if p.text)
-        else:
-            text = ""
+            author = getattr(final_event, "author", "") or "" if final_event else ""
 
-        author = getattr(final_event, "author", "") or "" if final_event else ""
-        usage = getattr(final_event, "usage_metadata", None) if final_event else None
-
-        return RunResult(
-            content=text,
-            author=author,
-            usage_metadata=usage,
-            session_id=session.id,
-        )
+            return RunResult(
+                content=text,
+                author=author,
+                usage=metrics.summary(),
+                session_id=session.id,
+            )
+        finally:
+            runner.plugin_manager.plugins.remove(metrics)
 
     async def run_streaming(
         self,
