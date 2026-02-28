@@ -92,10 +92,6 @@ def _validate_ast(expression: str) -> None:
             raise ValueError(f"Access to '{child.attr}' is not allowed")
 
 
-# Indirection layer so the word 'eval' only appears once at the call site
-_do_eval = eval  # noqa: A001
-
-
 class ConditionTool(BasePlatformTool):
     name = "condition"
     description = "Evaluate a boolean expression safely. Returns true or false."
@@ -112,7 +108,9 @@ class ConditionTool(BasePlatformTool):
             return {"result": False, "error": str(exc)}
 
         try:
-            result = bool(_do_eval(expression, {"__builtins__": _SAFE_BUILTINS}))
+            # Security: AST validation above is the actual security boundary,
+            # not the restricted builtins alone.
+            result = bool(eval(expression, {"__builtins__": _SAFE_BUILTINS}))  # noqa: S307
             return {"result": result}
         except Exception as exc:
             return {"result": False, "error": f"Evaluation error: {exc}"}

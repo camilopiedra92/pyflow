@@ -208,11 +208,11 @@ orchestration:
 
 Agents communicate through **session state** — a shared key-value store.
 
-1. The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction
+1. The `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM agent instruction at runtime
 2. The executor injects `current_date`, `current_datetime`, and `timezone` into session state
 3. An agent writes results to `state[output_key]`
-3. The next agent reads from `state` via `input_keys` (for `code`/`expr`) or `{variable}` templates in instructions (for `llm`)
-4. ToolAgent resolves `{variable}` placeholders in `tool_config` from state
+4. The next agent reads from `state` via `input_keys` (for `code`/`expr`) or `{variable}` templates in instructions (for `llm`)
+5. ToolAgent resolves `{variable}` placeholders in `tool_config` from state
 
 ### Platform-Injected State
 
@@ -226,7 +226,7 @@ Every session starts with these variables pre-populated:
 
 Configure timezone via `PYFLOW_TIMEZONE` env var (defaults to system timezone).
 
-All LLM agents automatically receive `NOW: {current_datetime} ({timezone}).` as the first line of their instruction — no manual setup needed. The variables above are also available for explicit use in `tool_config` or `input_keys`.
+All LLM agents automatically receive `NOW: {current_datetime} ({timezone}).` via the `GlobalInstructionPlugin` at runtime — no manual setup needed. The variables above are also available for explicit use in `tool_config` or `input_keys`.
 
 ```yaml
 agents:
@@ -602,6 +602,17 @@ These tools are provided by Google ADK and available by name in any workflow. Th
 |------|---------|
 | `exit_loop` | Signal loop completion from within a LoopAgent |
 | `get_user_choice` | Async user interaction — pauses for user input (long-running) |
+| `transfer_to_agent` | Transfer control to another agent (useful for `llm_routed` orchestration) |
+
+### FQN Tools (Fully-Qualified Name)
+
+Any Python callable can be referenced as a tool using its dotted module path. The ToolRegistry resolves these via `importlib` at hydration time:
+
+```yaml
+tools: [http_request, mypackage.tools.custom_search]
+```
+
+Resolution order: custom platform tools > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`.
 
 ### Creating Custom Tools
 
@@ -668,24 +679,22 @@ class MyApiTool(BasePlatformTool):
 
 ## Callbacks
 
-LLM agents support lifecycle callbacks that run before and/or after the agent runs. Callbacks are registered by name in Python and referenced by name in YAML.
+LLM agents support lifecycle callbacks that run before and/or after the agent runs. Callbacks are referenced by their Python fully-qualified name (FQN) in YAML and resolved via `importlib` at hydration time.
 
-### Registering a Callback
+### Defining a Callback
 
 ```python
-from pyflow.platform.callbacks import register_callback
-
+# mypackage/callbacks.py
 async def log_start(callback_context):
     print(f"Agent starting: {callback_context.agent_name}")
 
 async def log_output(callback_context):
     print(f"Agent finished: {callback_context.agent_name}")
-
-register_callback("log_start", log_start)
-register_callback("log_output", log_output)
 ```
 
 ### Using Callbacks in YAML
+
+Reference callbacks by their full Python dotted path:
 
 ```yaml
 - name: analyzer
@@ -693,15 +702,15 @@ register_callback("log_output", log_output)
   model: gemini-2.5-flash
   instruction: "Analyze the data"
   callbacks:
-    before_agent: log_start
-    after_agent: log_output
+    before_agent: mypackage.callbacks.log_start
+    after_agent: mypackage.callbacks.log_output
   output_key: analysis
 ```
 
 **How it works:**
 - The YAML key (e.g. `before_agent`) is auto-normalized to the ADK parameter name (`before_agent_callback`)
-- If a callback name isn't found in the registry, it's silently ignored — this allows referencing optional callbacks
-- Callbacks are resolved at hydration time, not at runtime
+- Callback values are Python FQNs resolved via `importlib` at hydration time — invalid FQNs raise `ModuleNotFoundError` or `AttributeError`
+- No registration needed — just write a Python function and reference it by path
 
 ### Available Hooks
 
@@ -714,7 +723,7 @@ register_callback("log_output", log_output)
 
 ## Runtime Config
 
-The `runtime` section configures the ADK services that back the workflow. All fields are optional with sensible defaults.
+The `runtime` section configures the ADK services that back the workflow. All fields are optional with sensible defaults. The executor wraps every workflow agent in an ADK `App` model, which enables context caching, event compaction, resumability, and app-level plugins.
 
 ```yaml
 runtime:
@@ -723,7 +732,17 @@ runtime:
   memory_service: none
   artifact_service: none
   artifact_dir: null
+  credential_service: none
   plugins: []
+  # Context caching (Gemini 2.0+)
+  context_cache_intervals: null
+  context_cache_ttl: null
+  context_cache_min_tokens: null
+  # Event compaction (long conversations)
+  compaction_interval: null
+  compaction_overlap: null
+  # Resumability
+  resumable: false
 ```
 
 ### Session Service
@@ -776,14 +795,104 @@ runtime:
   artifact_dir: "./output/artifacts"
 ```
 
+### Credential Service
+
+PyFlow has **two mechanisms** for tool authentication, each for a different use case:
+
+#### `get_secret()` — Static API keys (default)
+
+The standard approach for API tokens, bearer tokens, and any fixed credential. Tools call `get_secret("name")` which checks `PYFLOW_{NAME}` env var first, then falls back to the platform secrets dict.
+
+```bash
+# .env (gitignored, auto-loaded in boot())
+PYFLOW_YNAB_API_TOKEN=your-token
+PYFLOW_SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+```
+
+```python
+from pyflow.tools.base import get_secret
+token = get_secret("ynab_api_token")  # reads PYFLOW_YNAB_API_TOKEN
+```
+
+This is what all current platform tools use (`ynab`, `http_request` with auth headers, `alert`). No runtime config needed.
+
+#### `credential_service` — OAuth and dynamic credentials (advanced)
+
+For tools that require interactive OAuth flows where the user logs in, and credentials are managed per-tool, per-session (access tokens, refresh tokens, expiration).
+
+| Value | Backend | Use when |
+|-------|---------|----------|
+| `none` *(default)* | Disabled | Most workflows — use `get_secret()` for static API keys |
+| `in_memory` | In-process store | Tools that need OAuth flows or per-session credential isolation |
+
+```yaml
+runtime:
+  credential_service: in_memory
+```
+
+ADK's `InMemoryCredentialService` is passed to the `Runner` and injected into the `ToolContext`, where tools can store and retrieve OAuth tokens.
+
+#### When to use which
+
+| Scenario | Mechanism |
+|----------|-----------|
+| API key set once in `.env` | `get_secret()` |
+| Bearer token, webhook URL | `get_secret()` |
+| OAuth with user login (Google, GitHub, etc.) | `credential_service: in_memory` |
+| Credentials that expire and auto-refresh | `credential_service: in_memory` |
+
+### Context Caching (Gemini 2.0+)
+
+Reduces latency and cost for long-context conversations by caching context prefixes.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `context_cache_intervals` | `int` | `null` | Cache every N turns |
+| `context_cache_ttl` | `int` | `null` | Cache TTL in seconds |
+| `context_cache_min_tokens` | `int` | `null` | Minimum tokens to trigger caching |
+
+```yaml
+runtime:
+  context_cache_intervals: 5
+  context_cache_ttl: 1800    # 30 minutes
+```
+
+### Event Compaction
+
+Summarizes long conversation histories to stay within context limits.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `compaction_interval` | `int` | `null` | Compact every N events |
+| `compaction_overlap` | `int` | `null` | Overlap window size |
+
+```yaml
+runtime:
+  compaction_interval: 20
+  compaction_overlap: 5
+```
+
+### Resumability
+
+Enables session resumption after crashes or disconnects.
+
+```yaml
+runtime:
+  resumable: true
+```
+
 ### Plugins
 
-ADK plugins that hook into the agent lifecycle.
+ADK plugins that hook into the agent lifecycle. The `GlobalInstructionPlugin` (datetime awareness) is always injected automatically — you don't need to add it.
 
 | Plugin | Purpose |
 |--------|---------|
 | `logging` | Structured logging of agent events |
-| `reflect_and_retry` | Auto-retry failed tool calls with reflection (experimental) |
+| `debug_logging` | Verbose debug-level logging |
+| `reflect_and_retry` | Auto-retry failed tool calls with reflection |
+| `context_filter` | Filter conversation context before LLM calls |
+| `save_files_as_artifacts` | Auto-save generated files as artifacts |
+| `multimodal_tool_results` | Support multimodal tool return values |
 
 ```yaml
 runtime:
@@ -987,8 +1096,8 @@ agents:                              # required, list of agent configs
     top_k: 40                        # optional
     agent_tools: [other_agent]       # optional, wraps agents as callable tools
     callbacks:
-      before_agent: callback_name
-      after_agent: callback_name
+      before_agent: mypackage.callbacks.fn  # Python FQN
+      after_agent: mypackage.callbacks.fn
     # Code fields:
     function: module.path.to.function
     # Tool fields:
@@ -1018,6 +1127,14 @@ runtime:                             # optional
   session_service: in_memory         # in_memory | sqlite | database
   memory_service: none               # in_memory | none
   artifact_service: none             # in_memory | file | none
+  credential_service: none           # in_memory | none
+  plugins: []                        # logging | debug_logging | reflect_and_retry | context_filter | save_files_as_artifacts | multimodal_tool_results
+  context_cache_intervals: null      # Gemini 2.0+ context caching
+  context_cache_ttl: null
+  context_cache_min_tokens: null
+  compaction_interval: null          # event compaction
+  compaction_overlap: null
+  resumable: false                   # session resumability
 
 a2a:                                 # optional, A2A protocol config
   version: "1.0.0"

@@ -173,6 +173,7 @@ Check:
 2. If it's a custom tool, does the file exist in `pyflow/tools/`?
 3. Does the custom tool class have `name = "exact_name"` as a class-level string?
 4. Is the tool module importable? Try: `python -c "import pyflow.tools.<module_name>"`
+5. For FQN tools (dotted paths like `mypackage.tools.func`): is the module importable and the attribute callable?
 
 ### ExprAgent AST validation error
 
@@ -191,6 +192,15 @@ Check:
 2. Is `.env` in the right location? Must be in or above the `agents/` directory
 3. Is `PYFLOW_LOAD_DOTENV=false` set? This disables auto-loading
 4. Check boot logs for `dotenv.loaded path=...` — if missing, `.env` wasn't found
+
+### Tool secret not configured / "API token not configured"
+
+**"API token not configured"** or tool returns `{"success": false, "error": "...token..."}` — The tool's `get_secret()` call can't find the secret.
+
+Check:
+1. Is the env var named correctly? `get_secret("ynab_api_token")` reads `PYFLOW_YNAB_API_TOKEN` (uppercased, `PYFLOW_` prefix)
+2. Is it in `.env`? Example: `PYFLOW_YNAB_API_TOKEN=your-token`
+3. Note: `get_secret()` is for static API keys. For OAuth flows (user login, token refresh), use `credential_service: in_memory` in the `runtime:` YAML config instead
 
 ### LiteLLM import error
 
@@ -239,11 +249,12 @@ expression: "data.get('key', 'default')"
 
 ### LLM uses wrong date
 
-The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM instruction automatically, and the executor injects the actual values into session state. If the agent still uses wrong dates:
+The `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM instruction at runtime (via the App model), and the executor injects the actual values into session state. If the agent still uses wrong dates:
 
 1. Check `PYFLOW_TIMEZONE` in `.env` — wrong timezone = wrong "today"
 2. The LLM may ignore the date prefix if the instruction is ambiguous — reinforce with explicit filtering guidance (e.g. "use since_date based on today's date")
 3. Verify the session state injection by checking executor tests
+4. Verify the `GlobalInstructionPlugin` is present in the App's plugin list (it's always injected first)
 
 ### Rate limiting / ResourceExhausted
 
@@ -296,13 +307,16 @@ Error occurs
 │   └── "DAG contains a cycle" → Break circular depends_on
 │
 ├── pyflow run fails at startup?
-│   ├── "Unknown tool" → Check tool name, verify tool file exists
+│   ├── "Unknown tool" → Check tool name, verify tool file exists, or use FQN (dotted path)
 │   ├── "not allowed" in expr → Simplify expression or use code agent
 │   ├── "Invalid function path" → Fix dotted path in code agent
+│   ├── "does not resolve to a callable" → FQN tool points to non-callable (e.g. a constant)
+│   ├── ModuleNotFoundError in callback → Callback FQN module doesn't exist
 │   └── LiteLLM import error → pip install litellm
 │
 ├── Runs but wrong output?
 │   ├── Empty result → Check output_key on final agent
+│   ├── "token not configured" → Check PYFLOW_{NAME} in .env (get_secret)
 │   ├── Wrong date → Check PYFLOW_TIMEZONE, reinforce date in instruction
 │   ├── ResourceExhausted → Filter data (since_date), use PlanReAct
 │   ├── Missing state between agents → Verify key names match
@@ -336,6 +350,10 @@ ADK built-in tools:
   preload_memory         — Preload all memories at session start
   load_artifacts         — Load artifacts into session
   get_user_choice        — Async user interaction (long-running)
+  transfer_to_agent      — Transfer control to another agent
+
+FQN tools (any Python callable via dotted path):
+  mypackage.tools.func   — Resolved via importlib at hydration time
 ```
 
 List custom tools: `pyflow list --tools`

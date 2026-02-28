@@ -54,6 +54,7 @@ orchestration:
 
 runtime:
   session_service: in_memory
+  plugins: [logging]
 
 a2a:
   version: "1.0.0"

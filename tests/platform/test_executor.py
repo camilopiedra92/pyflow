@@ -3,27 +3,36 @@ from __future__ import annotations
 import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from google.adk.agents import BaseAgent
+
 from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.workflow import RuntimeConfig
 from pyflow.platform.executor import WorkflowExecutor, _detect_system_timezone
 
 
+def _mock_agent():
+    """Create a MagicMock that passes App's BaseAgent validation."""
+    return MagicMock(spec=BaseAgent)
+
+
 class TestBuildRunner:
-    def test_default_runtime(self):
+    def test_default_runtime_uses_app_model(self):
         executor = WorkflowExecutor()
-        agent = MagicMock()
+        agent = _mock_agent()
         runtime = RuntimeConfig()
         with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
             with patch("pyflow.platform.executor.InMemorySessionService"):
                 executor.build_runner(agent, runtime)
                 mock_runner_cls.assert_called_once()
-                # session_service should be InMemorySessionService
                 call_kwargs = mock_runner_cls.call_args[1]
+                # Runner should receive app= instead of agent=
+                assert "app" in call_kwargs
                 assert call_kwargs["session_service"] is not None
 
     def test_memory_service_in_memory(self):
         executor = WorkflowExecutor()
-        agent = MagicMock()
+        agent = _mock_agent()
         runtime = RuntimeConfig(memory_service="in_memory")
         with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
             with patch("pyflow.platform.executor.InMemorySessionService"):
@@ -33,7 +42,7 @@ class TestBuildRunner:
 
     def test_memory_service_none(self):
         executor = WorkflowExecutor()
-        agent = MagicMock()
+        agent = _mock_agent()
         runtime = RuntimeConfig(memory_service="none")
         with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
             with patch("pyflow.platform.executor.InMemorySessionService"):
@@ -41,15 +50,112 @@ class TestBuildRunner:
                 call_kwargs = mock_runner_cls.call_args[1]
                 assert call_kwargs["memory_service"] is None
 
-    def test_plugins_resolved(self):
+    def test_plugins_included_in_app(self):
         executor = WorkflowExecutor()
-        agent = MagicMock()
+        agent = _mock_agent()
         runtime = RuntimeConfig(plugins=["logging"])
         with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
             with patch("pyflow.platform.executor.InMemorySessionService"):
                 executor.build_runner(agent, runtime)
                 call_kwargs = mock_runner_cls.call_args[1]
-                assert call_kwargs["plugins"] is not None
+                # Plugins are now in the App, not passed directly to Runner
+                app = call_kwargs["app"]
+                assert len(app.plugins) >= 2  # GlobalInstruction + logging
+
+    def test_global_instruction_plugin_always_present(self):
+        """GlobalInstructionPlugin should be the first plugin in every App."""
+        from google.adk.plugins.global_instruction_plugin import GlobalInstructionPlugin
+
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig()
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                app = mock_runner_cls.call_args[1]["app"]
+                assert isinstance(app.plugins[0], GlobalInstructionPlugin)
+
+    def test_context_cache_config(self):
+        """RuntimeConfig with context caching -> App gets ContextCacheConfig."""
+        from google.adk.apps.app import ContextCacheConfig
+
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig(
+            context_cache_intervals=5,
+            context_cache_ttl=600,
+            context_cache_min_tokens=100,
+        )
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                app = mock_runner_cls.call_args[1]["app"]
+                assert isinstance(app.context_cache_config, ContextCacheConfig)
+                assert app.context_cache_config.cache_intervals == 5
+                assert app.context_cache_config.ttl_seconds == 600
+                assert app.context_cache_config.min_tokens == 100
+
+    def test_no_context_cache_by_default(self):
+        """Default RuntimeConfig -> App has no context_cache_config."""
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig()
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                app = mock_runner_cls.call_args[1]["app"]
+                assert app.context_cache_config is None
+
+    def test_events_compaction_config(self):
+        """RuntimeConfig with compaction -> App gets EventsCompactionConfig."""
+        from google.adk.apps.compaction import EventsCompactionConfig
+
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig(compaction_interval=10, compaction_overlap=3)
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                app = mock_runner_cls.call_args[1]["app"]
+                assert isinstance(app.events_compaction_config, EventsCompactionConfig)
+                assert app.events_compaction_config.compaction_interval == 10
+                assert app.events_compaction_config.overlap_size == 3
+
+    def test_resumability_config(self):
+        """RuntimeConfig with resumable=True -> App gets ResumabilityConfig."""
+        from google.adk.apps import ResumabilityConfig
+
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig(resumable=True)
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                app = mock_runner_cls.call_args[1]["app"]
+                assert isinstance(app.resumability_config, ResumabilityConfig)
+                assert app.resumability_config.is_resumable is True
+
+    def test_credential_service_in_memory(self):
+        """RuntimeConfig with credential_service='in_memory' -> Runner gets credential service."""
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig(credential_service="in_memory")
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                call_kwargs = mock_runner_cls.call_args[1]
+                assert call_kwargs["credential_service"] is not None
+
+    def test_credential_service_none_by_default(self):
+        """Default RuntimeConfig -> credential_service is None."""
+        executor = WorkflowExecutor()
+        agent = _mock_agent()
+        runtime = RuntimeConfig()
+        with patch("pyflow.platform.executor.Runner") as mock_runner_cls:
+            with patch("pyflow.platform.executor.InMemorySessionService"):
+                executor.build_runner(agent, runtime)
+                call_kwargs = mock_runner_cls.call_args[1]
+                assert call_kwargs["credential_service"] is None
 
 
 class TestRun:

@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 482 tests
+- `pytest -v` — run all 528 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -47,7 +47,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/platform/registry/discovery.py` — Filesystem scanner for tools and agent packages
 - `pyflow/platform/hydration/hydrator.py` — WorkflowHydrator: YAML -> Pydantic -> ADK Agent tree; `build_root_agent()` factory for agent packages
 - `pyflow/platform/hydration/schema.py` — json_schema_to_pydantic: JSON Schema -> dynamic Pydantic models
-- `pyflow/platform/executor.py` — WorkflowExecutor: builds ADK Runner, injects datetime state into sessions
+- `pyflow/platform/executor.py` — WorkflowExecutor: wraps agent in ADK App, builds Runner, injects datetime state via GlobalInstructionPlugin
 - `pyflow/platform/a2a/cards.py` — AgentCardGenerator: generate A2A cards from workflow definitions (opt-in via `a2a:` section)
 - `pyflow/tools/base.py` — BasePlatformTool ABC + auto-registration via `__init_subclass__`
 - `pyflow/tools/http.py` — HttpTool (httpx, SSRF protection)
@@ -60,9 +60,10 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools)
 - `pyflow/models/tool.py` — ToolMetadata
-- `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone)
+- `pyflow/platform/callbacks.py` — FQN-based callback resolution via `importlib` (Python dotted paths like `mypackage.callbacks.log_request`)
+- `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone, cors_origins)
 - `pyflow/cli.py` — Typer CLI (run, validate, list, init, serve)
-- `pyflow/server.py` — FastAPI server with REST + A2A endpoints
+- `pyflow/server.py` — FastAPI server with REST + A2A endpoints + optional CORS middleware
 - `pyflow/config.py` — structlog configuration
 - `agents/` — ADK-compatible agent packages (each with `__init__.py`, `agent.py`, `workflow.yaml`)
 - `tests/` — mirrors source structure, pytest + pytest-asyncio
@@ -81,7 +82,8 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `description` on LLM agents is used by `llm_routed` orchestration for agent routing
 - `include_contents: "none"` hides conversation history from an agent (isolated sub-tasks)
 - `agent_tools` wraps referenced agents as ADK `AgentTool` for agent-as-tool composition
-- Built-in tool catalog (lazy-imported from ADK): `exit_loop`, `google_search`, `google_maps_grounding`, `enterprise_web_search`, `url_context`, `load_memory`, `preload_memory`, `load_artifacts`, `get_user_choice`
+- Built-in tool catalog (lazy-imported from ADK): `exit_loop`, `google_search`, `google_maps_grounding`, `enterprise_web_search`, `url_context`, `load_memory`, `preload_memory`, `load_artifacts`, `get_user_choice`, `transfer_to_agent`
+- FQN tool resolution: ToolRegistry falls back to `importlib` import for dotted names (e.g. `tools: ["http_request", "mypackage.tools.custom_search"]`)
 - OrchestrationConfig supports `planner: builtin` with `planner_config: {thinking_budget: N}` for Gemini BuiltInPlanner
 - A2A agent cards are generated at boot from `workflow.yaml` `a2a:` section (opt-in: only workflows with explicit `a2a:` get cards)
 - Each agent package exports `root_agent` via `__init__.py` for ADK compatibility (`adk web`, `adk deploy`); `agent.py` uses `build_root_agent(__file__)` factory
@@ -89,8 +91,13 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Agent packages support standalone A2A deployment or monolith mode via `pyflow serve`
 - `get_secret(name)` reads `PYFLOW_{NAME}` env var first, falls back to `_PLATFORM_SECRETS` dict. Tools use this for API tokens.
 - PlatformConfig uses `pydantic-settings BaseSettings` — reads env vars with `PYFLOW_` prefix and `.env` files automatically
-- Hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction automatically — all agents are datetime-aware
+- `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM agent instruction at runtime — all agents are datetime-aware (moved from hydrator build-time to executor runtime via ADK plugin)
 - Executor injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session state
+- Executor wraps agent in ADK `App` model (`Runner(app=app)` instead of `Runner(agent=agent)`) — unlocks context caching, event compaction, resumability, app-level plugins
+- RuntimeConfig supports `context_cache_intervals/ttl/min_tokens` (Gemini 2.0+ context caching), `compaction_interval/overlap` (long conversation compaction), `resumable` (session resumability), `credential_service` (`in_memory` or `none`)
+- Callbacks resolved via Python FQN (fully-qualified names) through `importlib` — e.g. `before_agent: "mypackage.callbacks.log_request"`. No manual registry needed
+- Plugin registry includes 6 ADK plugins: `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`
+- CORS middleware opt-in via `PlatformConfig.cors_origins` (env: `PYFLOW_CORS_ORIGINS`)
 - `PYFLOW_TIMEZONE` env var configures timezone (defaults to system timezone detection via `/etc/localtime`)
 - Platform auto-loads `.env` during `boot()` (ADK-aligned: walks from `workflows_dir` to root, preserves explicit env vars, respects `ADK_DISABLE_LOAD_DOTENV`). Disable via `PYFLOW_LOAD_DOTENV=false`
 
@@ -104,7 +111,7 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `buil
 
 ## Testing
 
-- 482 tests across 35 test files
+- 528 tests across 35 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
@@ -113,7 +120,7 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `buil
 
 ## Dependencies
 
-- `google-adk>=1.25` — ADK runtime (Runner, Session, Agents, FunctionTool)
+- `google-adk>=1.26` — ADK runtime (App, Runner, Session, Agents, FunctionTool, Plugins)
 - `pydantic>=2.0` — data validation and models
 - `pyyaml>=6.0` — YAML workflow parsing
 - `httpx>=0.27` — HTTP client for tools and tests

@@ -27,3 +27,4 @@ class PlatformConfig(BaseSettings):
     port: int = Field(default=8000, ge=1, le=65535)
     timezone: str = ""
     secrets: dict[str, str] = Field(default_factory=dict)
+    cors_origins: list[str] = Field(default_factory=list)

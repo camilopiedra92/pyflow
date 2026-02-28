@@ -24,9 +24,21 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Boot platform on startup, shutdown on exit."""
-    platform = PyFlowPlatform(PlatformConfig())
+    config = PlatformConfig()
+    platform = PyFlowPlatform(config)
     await platform.boot()
     app.state.platform = platform
+
+    if config.cors_origins:
+        from fastapi.middleware.cors import CORSMiddleware
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=config.cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     logger.info("server.started")
     yield
     await platform.shutdown()

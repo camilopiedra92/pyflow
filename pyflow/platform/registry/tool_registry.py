@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from collections.abc import Callable
 
 from google.adk.tools import FunctionTool
@@ -23,13 +24,15 @@ _ADK_BUILTIN_TOOLS: dict[str, Callable] = {
     "load_artifacts": lambda: _lazy_import_builtin("google.adk.tools", "load_artifacts"),
     # Interactive tools
     "get_user_choice": lambda: _lazy_import_builtin("google.adk.tools", "get_user_choice"),
+    # Agent transfer (useful for llm_routed orchestration)
+    "transfer_to_agent": lambda: FunctionTool(
+        func=_lazy_import_builtin("google.adk.tools", "transfer_to_agent")
+    ),
 }
 
 
 def _lazy_import_builtin(module_path: str, attr: str):
     """Lazy-import an ADK built-in tool. Returns None if not available."""
-    import importlib
-
     mod = importlib.import_module(module_path)
     return getattr(mod, attr)
 
@@ -61,13 +64,26 @@ class ToolRegistry:
     def get_function_tool(self, name: str) -> FunctionTool:
         """Get an ADK FunctionTool by tool name.
 
-        Custom tools take priority over ADK built-in tools.
+        Resolution order: custom tools > ADK built-in tools > FQN import.
         """
         if name in self._tools:
             return self._tools[name]().as_function_tool()
         if name in _ADK_BUILTIN_TOOLS:
             return _ADK_BUILTIN_TOOLS[name]()
+        # FQN fallback: try to import as 'module.callable'
+        if "." in name:
+            return self._resolve_fqn_tool(name)
         raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
+
+    @staticmethod
+    def _resolve_fqn_tool(fqn: str) -> FunctionTool:
+        """Resolve a fully-qualified Python name to an ADK FunctionTool."""
+        module_path, obj_name = fqn.rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        obj = getattr(module, obj_name)
+        if callable(obj):
+            return FunctionTool(func=obj)
+        raise KeyError(f"FQN '{fqn}' does not resolve to a callable.")
 
     def resolve_tools(self, names: list[str]) -> list:
         """Batch resolve tool names to ADK FunctionTools."""
