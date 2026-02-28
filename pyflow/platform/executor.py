@@ -231,10 +231,10 @@ class WorkflowExecutor:
             case "in_memory":
                 return InMemorySessionService()
             case "sqlite":
-                url = runtime.session_db_url or "sqlite+aiosqlite:///pyflow_sessions.db"
-                from google.adk.sessions.database_session_service import DatabaseSessionService
+                path = runtime.session_db_path or "pyflow_sessions.db"
+                from google.adk.sessions.sqlite_session_service import SqliteSessionService
 
-                return DatabaseSessionService(db_url=url)
+                return SqliteSessionService(db_path=path)
             case "database":
                 if not runtime.session_db_url:
                     raise ValueError("database session_service requires session_db_url")

@@ -294,6 +294,26 @@ class WorkflowHydrator:
         return None
 
 
+def _mcp_config_to_params(config):
+    """Convert McpServerConfig to ADK connection params."""
+    if config.transport == "sse":
+        from google.adk.tools.mcp_tool.mcp_toolset import SseConnectionParams
+
+        kwargs = {"url": config.uri}
+        if config.headers:
+            kwargs["headers"] = config.headers
+        return SseConnectionParams(**kwargs)
+    elif config.transport == "stdio":
+        from mcp import StdioServerParameters
+
+        kwargs = {"command": config.command, "args": config.args}
+        if config.env:
+            kwargs["env"] = config.env
+        return StdioServerParameters(**kwargs)
+    else:
+        raise ValueError(f"Unknown MCP transport: {config.transport}")
+
+
 def build_root_agent(caller_file: str) -> BaseAgent:
     """Build an ADK root_agent from the workflow.yaml next to caller_file.
 
