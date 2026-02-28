@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from pyflow.models.a2a import AgentCard, AgentCardSkill
+from pyflow.models.a2a import AgentCard
+from pyflow.models.workflow import SkillDef
 
 
-class TestAgentCardSkill:
+class TestSkillDef:
     def test_creation_with_all_fields(self):
-        skill = AgentCardSkill(
+        skill = SkillDef(
             id="summarize",
             name="Summarize",
             description="Summarizes text",
@@ -19,20 +20,20 @@ class TestAgentCardSkill:
         assert skill.tags == ["nlp", "text"]
 
     def test_defaults(self):
-        skill = AgentCardSkill(id="skill_1", name="Skill One")
+        skill = SkillDef(id="skill_1", name="Skill One")
         assert skill.description == ""
         assert skill.tags == []
 
     def test_id_required(self):
         with pytest.raises(Exception):
-            AgentCardSkill(name="missing_id")
+            SkillDef(name="missing_id")
 
     def test_name_required(self):
         with pytest.raises(Exception):
-            AgentCardSkill(id="missing_name")
+            SkillDef(id="missing_name")
 
     def test_serialization(self):
-        skill = AgentCardSkill(id="s1", name="S1", description="desc", tags=["a"])
+        skill = SkillDef(id="s1", name="S1", description="desc", tags=["a"])
         data = skill.model_dump()
         assert data == {"id": "s1", "name": "S1", "description": "desc", "tags": ["a"]}
 
@@ -50,7 +51,7 @@ class TestAgentCard:
             default_output_modes=["text/plain"],
             supports_authenticated_extended_card=True,
             skills=[
-                AgentCardSkill(id="s1", name="Skill 1"),
+                SkillDef(id="s1", name="Skill 1"),
             ],
         )
         assert card.name == "my_agent"
@@ -88,7 +89,7 @@ class TestAgentCard:
         card = AgentCard(
             name="agent",
             url="http://localhost:8000",
-            skills=[AgentCardSkill(id="s1", name="S1")],
+            skills=[SkillDef(id="s1", name="S1")],
         )
         data = card.model_dump()
         assert data["name"] == "agent"

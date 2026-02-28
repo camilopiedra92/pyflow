@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pyflow.models.a2a import AgentCard, AgentCardSkill
+from pyflow.models.a2a import AgentCard
 from pyflow.models.agent import AgentConfig
 from pyflow.models.platform import PlatformConfig
 from pyflow.models.runner import RunResult
@@ -22,7 +22,6 @@ from pyflow.models.workflow import (
 
 __all__ = [
     "AgentCard",
-    "AgentCardSkill",
     "AgentConfig",
     "A2AConfig",
     "DagNode",

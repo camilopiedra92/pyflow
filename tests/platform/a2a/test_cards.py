@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyflow.models.a2a import AgentCard, AgentCardSkill
+from pyflow.models.a2a import AgentCard
+from pyflow.models.workflow import SkillDef
 from pyflow.models.agent import AgentConfig
 from pyflow.models.workflow import A2AConfig, OrchestrationConfig, SkillDef, WorkflowDef
 from pyflow.platform.a2a.cards import AgentCardGenerator
@@ -140,7 +141,7 @@ class TestCardStructure:
 
         assert len(card.skills) == 2
         for skill in card.skills:
-            assert isinstance(skill, AgentCardSkill)
+            assert isinstance(skill, SkillDef)
             assert skill.id
             assert skill.name
             assert skill.description

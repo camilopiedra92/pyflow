@@ -2,14 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-
-class AgentCardSkill(BaseModel):
-    """A2A agent card skill descriptor."""
-
-    id: str
-    name: str
-    description: str = ""
-    tags: list[str] = []
+from pyflow.models.workflow import SkillDef
 
 
 class AgentCard(BaseModel):
@@ -24,4 +17,4 @@ class AgentCard(BaseModel):
     default_input_modes: list[str] = ["text/plain"]
     default_output_modes: list[str] = ["application/json"]
     supports_authenticated_extended_card: bool = False
-    skills: list[AgentCardSkill] = []
+    skills: list[SkillDef] = []

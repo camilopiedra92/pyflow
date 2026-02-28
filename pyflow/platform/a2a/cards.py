@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pyflow.models.a2a import AgentCard, AgentCardSkill
-from pyflow.models.workflow import WorkflowDef
+from pyflow.models.a2a import AgentCard
+from pyflow.models.workflow import SkillDef, WorkflowDef
 
 
 class AgentCardGenerator:
@@ -12,17 +12,9 @@ class AgentCardGenerator:
 
     def generate_card(self, workflow: WorkflowDef) -> AgentCard:
         """Generate an A2A agent card for a single workflow."""
-        skills: list[AgentCardSkill] = []
+        skills: list[SkillDef] = []
         if workflow.a2a and workflow.a2a.skills:
-            skills = [
-                AgentCardSkill(
-                    id=skill.id,
-                    name=skill.name,
-                    description=skill.description,
-                    tags=skill.tags,
-                )
-                for skill in workflow.a2a.skills
-            ]
+            skills = list(workflow.a2a.skills)
 
         return AgentCard(
             name=workflow.name,
