@@ -114,6 +114,108 @@ class TestAgentConfigCallbacks:
         assert config.callbacks is None
 
 
+class TestAgentConfigCode:
+    def test_code_agent_valid(self):
+        agent = AgentConfig(
+            name="compute",
+            type="code",
+            function="myapp.utils.compute_score",
+            input_keys=["raw_data"],
+            output_key="score",
+        )
+        assert agent.type == "code"
+        assert agent.function == "myapp.utils.compute_score"
+        assert agent.input_keys == ["raw_data"]
+        assert agent.output_key == "score"
+
+    def test_code_agent_requires_function(self):
+        with pytest.raises(ValidationError, match="function"):
+            AgentConfig(name="bad", type="code", output_key="result")
+
+    def test_code_agent_requires_output_key(self):
+        with pytest.raises(ValidationError, match="output_key"):
+            AgentConfig(name="bad", type="code", function="mod.func")
+
+    def test_code_agent_defaults(self):
+        agent = AgentConfig(
+            name="minimal",
+            type="code",
+            function="mod.func",
+            output_key="out",
+        )
+        assert agent.input_keys is None
+        assert agent.model is None
+        assert agent.sub_agents is None
+
+
+class TestAgentConfigTool:
+    def test_tool_agent_valid(self):
+        agent = AgentConfig(
+            name="fetcher",
+            type="tool",
+            tool="http_request",
+            tool_config={"url": "https://api.example.com/data", "method": "GET"},
+            output_key="api_data",
+        )
+        assert agent.type == "tool"
+        assert agent.tool == "http_request"
+        assert agent.tool_config == {"url": "https://api.example.com/data", "method": "GET"}
+        assert agent.output_key == "api_data"
+
+    def test_tool_agent_requires_tool(self):
+        with pytest.raises(ValidationError, match="tool"):
+            AgentConfig(name="bad", type="tool", output_key="result")
+
+    def test_tool_agent_requires_output_key(self):
+        with pytest.raises(ValidationError, match="output_key"):
+            AgentConfig(name="bad", type="tool", tool="http_request")
+
+    def test_tool_agent_defaults(self):
+        agent = AgentConfig(
+            name="minimal",
+            type="tool",
+            tool="http_request",
+            output_key="out",
+        )
+        assert agent.tool_config is None
+        assert agent.model is None
+        assert agent.sub_agents is None
+
+
+class TestAgentConfigExpr:
+    def test_expr_agent_valid(self):
+        agent = AgentConfig(
+            name="calc",
+            type="expr",
+            expression="price * quantity",
+            input_keys=["price", "quantity"],
+            output_key="total",
+        )
+        assert agent.type == "expr"
+        assert agent.expression == "price * quantity"
+        assert agent.input_keys == ["price", "quantity"]
+        assert agent.output_key == "total"
+
+    def test_expr_agent_requires_expression(self):
+        with pytest.raises(ValidationError, match="expression"):
+            AgentConfig(name="bad", type="expr", output_key="result")
+
+    def test_expr_agent_requires_output_key(self):
+        with pytest.raises(ValidationError, match="output_key"):
+            AgentConfig(name="bad", type="expr", expression="1 + 1")
+
+    def test_expr_agent_defaults(self):
+        agent = AgentConfig(
+            name="minimal",
+            type="expr",
+            expression="42",
+            output_key="answer",
+        )
+        assert agent.input_keys is None
+        assert agent.model is None
+        assert agent.sub_agents is None
+
+
 class TestAgentConfigInvalidType:
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):

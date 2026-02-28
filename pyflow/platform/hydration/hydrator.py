@@ -10,7 +10,10 @@ from google.adk.planners import PlanReActPlanner
 
 from pyflow.models.agent import AgentConfig
 from pyflow.models.workflow import WorkflowDef
+from pyflow.platform.agents.code_agent import CodeAgent
 from pyflow.platform.agents.dag_agent import DagAgent, DagNode
+from pyflow.platform.agents.expr_agent import ExprAgent
+from pyflow.platform.agents.tool_agent import ToolAgent
 from pyflow.platform.callbacks import resolve_callback
 
 if TYPE_CHECKING:
@@ -57,15 +60,22 @@ class WorkflowHydrator:
     def _build_all_agents(self, configs: list[AgentConfig]) -> dict[str, BaseAgent]:
         """Build all agents, resolving sub_agents references.
 
-        First pass builds LLM agents (no sub_agent dependencies).
+        First pass builds leaf agents (no sub_agent dependencies): llm, code, tool.
         Second pass builds workflow agents (may reference other agents as sub_agents).
         """
         agents: dict[str, BaseAgent] = {}
 
-        # First pass: build all LLM agents (no sub_agent dependencies)
+        # First pass: build leaf agents (no sub_agent dependencies)
         for config in configs:
-            if config.type == "llm":
-                agents[config.name] = self._build_llm_agent(config)
+            match config.type:
+                case "llm":
+                    agents[config.name] = self._build_llm_agent(config)
+                case "code":
+                    agents[config.name] = self._build_code_agent(config)
+                case "tool":
+                    agents[config.name] = self._build_tool_agent(config)
+                case "expr":
+                    agents[config.name] = self._build_expr_agent(config)
 
         # Second pass: build workflow agents (may reference other agents)
         for config in configs:
@@ -91,6 +101,34 @@ class WorkflowHydrator:
             kwargs["output_key"] = config.output_key
 
         return LlmAgent(**kwargs)
+
+    def _build_code_agent(self, config: AgentConfig) -> CodeAgent:
+        """Build a CodeAgent from AgentConfig."""
+        return CodeAgent(
+            name=config.name,
+            function_path=config.function,
+            input_keys=config.input_keys or [],
+            output_key=config.output_key,
+        )
+
+    def _build_tool_agent(self, config: AgentConfig) -> ToolAgent:
+        """Build a ToolAgent from AgentConfig. Resolves tool by name at hydration time."""
+        tool_instance = self._tool_registry.get(config.tool)
+        return ToolAgent(
+            name=config.name,
+            tool_instance=tool_instance,
+            fixed_config=config.tool_config or {},
+            output_key=config.output_key,
+        )
+
+    def _build_expr_agent(self, config: AgentConfig) -> ExprAgent:
+        """Build an ExprAgent from AgentConfig."""
+        return ExprAgent(
+            name=config.name,
+            expression=config.expression,
+            input_keys=config.input_keys or [],
+            output_key=config.output_key,
+        )
 
     def _build_workflow_agent(self, config: AgentConfig, agents: dict[str, BaseAgent]) -> BaseAgent:
         """Build a workflow agent (sequential/parallel/loop) from AgentConfig."""

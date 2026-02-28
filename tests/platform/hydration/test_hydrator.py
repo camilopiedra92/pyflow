@@ -521,3 +521,237 @@ class TestHydrateLoopMaxIterations:
 
         assert isinstance(root, LoopAgent)
         # max_iterations should be None or default when not specified
+
+
+# ---------------------------------------------------------------------------
+# CodeAgent and ToolAgent hydration tests
+# ---------------------------------------------------------------------------
+
+
+class TestHydrateCodeAgent:
+    def test_code_agent_hydrated(self, mock_tool_registry):
+        """AgentConfig type=code -> CodeAgent with function_path, input_keys, output_key."""
+        from pyflow.platform.agents.code_agent import CodeAgent
+
+        agents = [
+            AgentConfig(
+                name="compute",
+                type="code",
+                function="myapp.utils.compute_score",
+                input_keys=["raw_data", "threshold"],
+                output_key="score",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        code_agent = root.sub_agents[0]
+        assert isinstance(code_agent, CodeAgent)
+        assert code_agent.name == "compute"
+        assert code_agent.function_path == "myapp.utils.compute_score"
+        assert code_agent.input_keys == ["raw_data", "threshold"]
+        assert code_agent.output_key == "score"
+
+    def test_code_agent_defaults_input_keys_to_empty(self, mock_tool_registry):
+        """Code agent with no input_keys -> defaults to empty list."""
+        from pyflow.platform.agents.code_agent import CodeAgent
+
+        agents = [
+            AgentConfig(
+                name="noop",
+                type="code",
+                function="builtins.dict",
+                output_key="result",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        code_agent = root.sub_agents[0]
+        assert isinstance(code_agent, CodeAgent)
+        assert code_agent.input_keys == []
+
+    def test_code_agent_in_sequential_with_llm(self, mock_tool_registry):
+        """Code agent alongside LLM agent in sequential orchestration."""
+        from pyflow.platform.agents.code_agent import CodeAgent
+
+        agents = [
+            AgentConfig(
+                name="transform",
+                type="code",
+                function="json.dumps",
+                input_keys=["data"],
+                output_key="json_data",
+            ),
+            _make_llm_agent_config(name="analyzer", instruction="Analyze"),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        assert len(root.sub_agents) == 2
+        assert isinstance(root.sub_agents[0], CodeAgent)
+        assert root.sub_agents[1].name == "analyzer"
+
+
+class TestHydrateToolAgent:
+    def test_tool_agent_hydrated(self, mock_tool_registry):
+        """AgentConfig type=tool -> ToolAgent with tool_instance, fixed_config, output_key."""
+        from pyflow.platform.agents.tool_agent import ToolAgent
+        from pyflow.tools.base import BasePlatformTool
+
+        mock_tool_instance = MagicMock(spec=BasePlatformTool)
+        mock_tool_registry.get.return_value = mock_tool_instance
+
+        agents = [
+            AgentConfig(
+                name="fetcher",
+                type="tool",
+                tool="http_request",
+                tool_config={"url": "https://api.example.com", "method": "GET"},
+                output_key="api_data",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        tool_agent = root.sub_agents[0]
+        assert isinstance(tool_agent, ToolAgent)
+        assert tool_agent.name == "fetcher"
+        assert tool_agent.tool_instance is mock_tool_instance
+        assert tool_agent.fixed_config == {"url": "https://api.example.com", "method": "GET"}
+        assert tool_agent.output_key == "api_data"
+        mock_tool_registry.get.assert_called_once_with("http_request")
+
+    def test_tool_agent_defaults_config_to_empty(self, mock_tool_registry):
+        """Tool agent with no tool_config -> defaults to empty dict."""
+        from pyflow.platform.agents.tool_agent import ToolAgent
+        from pyflow.tools.base import BasePlatformTool
+
+        mock_tool_registry.get.return_value = MagicMock(spec=BasePlatformTool)
+
+        agents = [
+            AgentConfig(
+                name="simple",
+                type="tool",
+                tool="http_request",
+                output_key="out",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        tool_agent = root.sub_agents[0]
+        assert isinstance(tool_agent, ToolAgent)
+        assert tool_agent.fixed_config == {}
+
+    def test_unknown_tool_raises(self, mock_tool_registry):
+        """Tool agent referencing unknown tool -> KeyError at hydration time."""
+        mock_tool_registry.get.side_effect = KeyError("Unknown tool: 'bad_tool'")
+
+        agents = [
+            AgentConfig(
+                name="bad",
+                type="tool",
+                tool="bad_tool",
+                output_key="out",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+
+        with pytest.raises(KeyError, match="bad_tool"):
+            hydrator.hydrate(workflow)
+
+
+# ---------------------------------------------------------------------------
+# ExprAgent hydration tests
+# ---------------------------------------------------------------------------
+
+
+class TestHydrateExprAgent:
+    def test_expr_agent_hydrated(self, mock_tool_registry):
+        """AgentConfig type=expr -> ExprAgent with expression, input_keys, output_key."""
+        from pyflow.platform.agents.expr_agent import ExprAgent
+
+        agents = [
+            AgentConfig(
+                name="calc",
+                type="expr",
+                expression="price * quantity",
+                input_keys=["price", "quantity"],
+                output_key="total",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        expr_agent = root.sub_agents[0]
+        assert isinstance(expr_agent, ExprAgent)
+        assert expr_agent.name == "calc"
+        assert expr_agent.expression == "price * quantity"
+        assert expr_agent.input_keys == ["price", "quantity"]
+        assert expr_agent.output_key == "total"
+
+    def test_expr_agent_defaults_input_keys_to_empty(self, mock_tool_registry):
+        """Expr agent with no input_keys -> defaults to empty list."""
+        from pyflow.platform.agents.expr_agent import ExprAgent
+
+        agents = [
+            AgentConfig(
+                name="const",
+                type="expr",
+                expression="42",
+                output_key="answer",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        expr_agent = root.sub_agents[0]
+        assert isinstance(expr_agent, ExprAgent)
+        assert expr_agent.input_keys == []
+
+    def test_expr_agent_in_sequential_with_llm(self, mock_tool_registry):
+        """Expr agent alongside LLM agent in sequential orchestration."""
+        from pyflow.platform.agents.expr_agent import ExprAgent
+
+        agents = [
+            AgentConfig(
+                name="margin",
+                type="expr",
+                expression="round((price - cost) / price * 100, 2)",
+                input_keys=["price", "cost"],
+                output_key="margin_pct",
+            ),
+            _make_llm_agent_config(name="reporter", instruction="Report margin"),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        assert len(root.sub_agents) == 2
+        assert isinstance(root.sub_agents[0], ExprAgent)
+        assert root.sub_agents[1].name == "reporter"
+
+    def test_unsafe_expression_fails_at_hydration(self, mock_tool_registry):
+        """Expr agent with unsafe expression -> ValueError at hydration time."""
+        agents = [
+            AgentConfig(
+                name="bad",
+                type="expr",
+                expression="__import__('os')",
+                output_key="result",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+
+        with pytest.raises(ValueError, match="not allowed"):
+            hydrator.hydrate(workflow)
