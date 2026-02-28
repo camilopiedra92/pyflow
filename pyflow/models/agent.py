@@ -5,6 +5,31 @@ from typing import Any, Literal
 from pydantic import BaseModel, model_validator
 
 
+class OpenApiAuthConfig(BaseModel):
+    """Authentication configuration for OpenAPI toolsets."""
+
+    type: Literal["none", "bearer", "apikey", "oauth2"] = "none"
+    # bearer: env var containing the token
+    token_env: str | None = None
+    # apikey
+    apikey_location: Literal["header", "query"] = "query"
+    apikey_name: str = "apikey"
+    # oauth2: authorization code flow
+    authorization_url: str | None = None
+    token_url: str | None = None
+    scopes: dict[str, str] | None = None
+    client_id_env: str | None = None
+    client_secret_env: str | None = None
+
+
+class OpenApiToolConfig(BaseModel):
+    """Configuration for auto-generating tools from an OpenAPI spec."""
+
+    spec: str
+    name_prefix: str | None = None
+    auth: OpenApiAuthConfig = OpenApiAuthConfig()
+
+
 class AgentConfig(BaseModel):
     """Configuration for an agent within a workflow."""
 
@@ -36,6 +61,8 @@ class AgentConfig(BaseModel):
     expression: str | None = None
     # AgentTool fields
     agent_tools: list[str] | None = None
+    # OpenAPI tools
+    openapi_tools: list[OpenApiToolConfig] = []
 
     @model_validator(mode="after")
     def _validate_by_type(self) -> AgentConfig:
