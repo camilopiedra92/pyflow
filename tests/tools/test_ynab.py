@@ -180,3 +180,221 @@ class TestYnabToolAccounts:
 
         assert result["success"] is True
         assert result["data"]["account"]["id"] == "acc-1"
+
+
+class TestYnabToolCategories:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_list_categories(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"category_groups": [{"id": "cg-1", "categories": []}]}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_categories", budget_id="b-1"
+            )
+
+        assert result["success"] is True
+        assert "category_groups" in result["data"]
+
+    async def test_update_category(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"category": {"id": "cat-1", "budgeted": 50000}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        update_data = json.dumps({"category": {"budgeted": 50000}})
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="update_category",
+                budget_id="b-1",
+                category_id="cat-1",
+                data=update_data,
+            )
+
+        assert result["success"] is True
+        client.request.assert_called_once()
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "PATCH"
+        assert call_kwargs["json"] == {"category": {"budgeted": 50000}}
+
+
+class TestYnabToolPayees:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_list_payees(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"payees": [{"id": "p-1", "name": "Amazon"}]}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_payees", budget_id="b-1"
+            )
+
+        assert result["success"] is True
+        assert result["data"]["payees"][0]["name"] == "Amazon"
+
+    async def test_update_payee(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"payee": {"id": "p-1", "name": "Amazon Prime"}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        update_data = json.dumps({"payee": {"name": "Amazon Prime"}})
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="update_payee",
+                budget_id="b-1",
+                payee_id="p-1",
+                data=update_data,
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "PATCH"
+
+
+class TestYnabToolTransactions:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_list_transactions(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"transactions": [{"id": "t-1", "amount": -50000}]}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_transactions", budget_id="b-1"
+            )
+
+        assert result["success"] is True
+        assert result["data"]["transactions"][0]["id"] == "t-1"
+
+    async def test_list_transactions_with_since_date(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"transactions": []}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="list_transactions",
+                budget_id="b-1",
+                since_date="2024-01-01",
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["params"] == {"since_date": "2024-01-01"}
+
+    async def test_create_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"transaction": {"id": "t-new", "amount": -25000}}}
+        mock_resp = _mock_ynab_response(201, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        txn_data = json.dumps({
+            "transaction": {
+                "account_id": "acc-1",
+                "date": "2024-06-15",
+                "amount": -25000,
+                "payee_name": "Coffee Shop",
+            }
+        })
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="create_transaction",
+                budget_id="b-1",
+                data=txn_data,
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "POST"
+        assert call_kwargs["json"]["transaction"]["amount"] == -25000
+
+    async def test_update_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"transaction": {"id": "t-1", "memo": "updated"}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        update_data = json.dumps({"transaction": {"id": "t-1", "memo": "updated"}})
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="update_transaction",
+                budget_id="b-1",
+                data=update_data,
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "PATCH"
+
+    async def test_get_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"transaction": {"id": "t-1", "amount": -10000}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="get_transaction",
+                budget_id="b-1",
+                transaction_id="t-1",
+            )
+
+        assert result["success"] is True
+        assert result["data"]["transaction"]["id"] == "t-1"
