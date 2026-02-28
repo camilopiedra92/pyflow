@@ -23,3 +23,6 @@ orchestration:
   agents:
     - checker
     - transformer
+
+runtime:
+  session_service: in_memory

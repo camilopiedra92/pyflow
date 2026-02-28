@@ -32,6 +32,9 @@ orchestration:
     - fetcher
     - analyzer
 
+runtime:
+  session_service: in_memory
+
 a2a:
   version: "1.0.0"
   skills:

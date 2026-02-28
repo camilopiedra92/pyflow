@@ -9,6 +9,7 @@ import yaml
 from pyflow.models.platform import PlatformConfig
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.app import PyFlowPlatform
+from pyflow.platform.executor import WorkflowExecutor
 
 
 class TestPlatformIntegration:
@@ -34,6 +35,7 @@ class TestPlatformIntegration:
         workflows = platform.list_workflows()
         names = [w.name for w in workflows]
         assert "exchange_tracker" in names
+        assert "example" in names
         await platform.shutdown()
 
     async def test_workflow_hydration_creates_agents(self):
@@ -58,8 +60,27 @@ class TestPlatformIntegration:
         assert card.skills[0].id == "rate_tracking"
         await platform.shutdown()
 
-    async def test_validate_example_workflow(self):
-        """Example workflow YAML is valid."""
+    async def test_platform_uses_workflow_executor(self):
+        """Platform uses WorkflowExecutor, not legacy PlatformRunner."""
+        config = PlatformConfig(workflows_dir="workflows")
+        platform = PyFlowPlatform(config)
+        assert isinstance(platform.executor, WorkflowExecutor)
+        assert not hasattr(platform, "runner"), "PlatformRunner should not exist"
+
+    async def test_run_workflow_accepts_user_id(self):
+        """Platform.run_workflow accepts user_id parameter."""
+        import inspect
+
+        sig = inspect.signature(PyFlowPlatform.run_workflow)
+        params = list(sig.parameters.keys())
+        assert "user_id" in params
+        # Verify the default value
+        assert sig.parameters["user_id"].default == "default"
+
+
+class TestWorkflowValidation:
+    async def test_validate_exchange_tracker_workflow(self):
+        """exchange_tracker.yaml is valid and parses correctly."""
         path = Path("workflows/exchange_tracker.yaml")
         assert path.exists()
         data = yaml.safe_load(path.read_text())
@@ -67,3 +88,62 @@ class TestPlatformIntegration:
         assert workflow.name == "exchange_tracker"
         assert len(workflow.agents) == 2
         assert workflow.orchestration.type == "sequential"
+
+    async def test_validate_example_workflow(self):
+        """example.yaml is valid and parses correctly."""
+        path = Path("workflows/example.yaml")
+        assert path.exists()
+        data = yaml.safe_load(path.read_text())
+        workflow = WorkflowDef(**data)
+        assert workflow.name == "example"
+        assert len(workflow.agents) == 2
+        assert workflow.orchestration.type == "sequential"
+
+
+class TestRuntimeConfig:
+    async def test_exchange_tracker_has_runtime_config(self):
+        """exchange_tracker.yaml includes runtime configuration."""
+        path = Path("workflows/exchange_tracker.yaml")
+        data = yaml.safe_load(path.read_text())
+        workflow = WorkflowDef(**data)
+        assert workflow.runtime.session_service == "in_memory"
+
+    async def test_example_has_runtime_config(self):
+        """example.yaml includes runtime configuration."""
+        path = Path("workflows/example.yaml")
+        data = yaml.safe_load(path.read_text())
+        workflow = WorkflowDef(**data)
+        assert workflow.runtime.session_service == "in_memory"
+
+    async def test_runtime_config_hydrates_correctly(self):
+        """Workflows with runtime config hydrate through the platform."""
+        config = PlatformConfig(workflows_dir="workflows")
+        platform = PyFlowPlatform(config)
+        await platform.boot()
+
+        hw = platform.workflows.get("exchange_tracker")
+        assert hw.definition.runtime.session_service == "in_memory"
+
+        hw_ex = platform.workflows.get("example")
+        assert hw_ex.definition.runtime.session_service == "in_memory"
+
+        await platform.shutdown()
+
+    async def test_runtime_defaults_when_omitted(self):
+        """RuntimeConfig defaults are applied when runtime section is absent."""
+        workflow = WorkflowDef(
+            name="no-runtime",
+            description="Workflow without explicit runtime",
+            agents=[
+                {
+                    "name": "a1",
+                    "type": "llm",
+                    "model": "gemini-2.5-flash",
+                    "instruction": "test",
+                }
+            ],
+            orchestration={"type": "sequential", "agents": ["a1"]},
+        )
+        assert workflow.runtime.session_service == "in_memory"
+        assert workflow.runtime.memory_service == "none"
+        assert workflow.runtime.artifact_service == "none"
