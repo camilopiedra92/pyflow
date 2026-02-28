@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from pyflow.models.a2a import AgentCard
@@ -65,19 +67,54 @@ async def list_workflows():
 class WorkflowInput(BaseModel):
     message: str = ""
     data: dict = {}
+    user_id: str = "default"
 
 
 @app.post("/api/workflows/{name}/run", response_model=WorkflowRunResponse)
 async def run_workflow(name: str, input_data: WorkflowInput):
     platform = _get_platform()
     try:
-        result = await platform.run_workflow(name, input_data.model_dump())
+        result = await platform.run_workflow(
+            name, input_data.model_dump(exclude={"user_id"}), user_id=input_data.user_id,
+        )
         return WorkflowRunResponse(result=result)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Workflow '{name}' not found")
     except Exception as e:
         logger.error("workflow.error", workflow=name, error=str(e))
         raise HTTPException(status_code=500, detail="Internal workflow error")
+
+
+@app.post("/api/workflows/{name}/stream")
+async def stream_workflow(name: str, input_data: WorkflowInput):
+    """Stream workflow execution events as server-sent events."""
+    platform = _get_platform()
+    try:
+        hw = platform.workflows.get(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Workflow '{name}' not found")
+
+    if hw.agent is None:
+        raise HTTPException(status_code=500, detail=f"Workflow '{name}' not hydrated")
+
+    runtime = hw.definition.runtime
+    runner = platform.executor.build_runner(hw.agent, runtime)
+
+    async def _event_stream():
+        async for event in platform.executor.run_streaming(
+            runner, user_id=input_data.user_id, message=input_data.message,
+        ):
+            payload = {
+                "author": getattr(event, "author", ""),
+                "is_final": event.is_final_response(),
+            }
+            if event.content and event.content.parts:
+                payload["content"] = event.content.parts[0].text or ""
+            else:
+                payload["content"] = ""
+            yield f"data: {json.dumps(payload)}\n\n"
+
+    return StreamingResponse(_event_stream(), media_type="text/event-stream")
 
 
 # --- A2A ---
@@ -93,7 +130,11 @@ async def a2a_execute(workflow_name: str, input_data: WorkflowInput):
     """A2A execution endpoint."""
     platform = _get_platform()
     try:
-        result = await platform.run_workflow(workflow_name, input_data.model_dump())
+        result = await platform.run_workflow(
+            workflow_name,
+            input_data.model_dump(exclude={"user_id"}),
+            user_id=input_data.user_id,
+        )
         return WorkflowRunResponse(result=result)
     except KeyError:
         raise HTTPException(
