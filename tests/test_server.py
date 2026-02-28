@@ -1,99 +1,190 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from httpx import AsyncClient, ASGITransport
-from pyflow.server import create_app
 
-FIXTURES = Path(__file__).parent / "fixtures"
+from pyflow.models.tool import ToolMetadata
+from pyflow.models.workflow import WorkflowDef
 
 
-class TestServer:
-    async def test_health_check(self):
-        app = create_app(FIXTURES)
+def _make_workflow(name: str = "test-wf", description: str = "A test workflow") -> WorkflowDef:
+    """Create a minimal WorkflowDef for testing."""
+    return WorkflowDef(
+        name=name,
+        description=description,
+        agents=[
+            {
+                "name": "agent1",
+                "type": "llm",
+                "model": "gemini-2.0-flash",
+                "instruction": "Do something",
+            }
+        ],
+        orchestration={"type": "sequential", "agents": ["agent1"]},
+    )
+
+
+@pytest.fixture
+async def client():
+    """Create an async test client with a mocked PyFlowPlatform."""
+    mock_platform = MagicMock()
+    mock_platform.is_booted = True
+    # Sync methods
+    mock_platform.list_tools.return_value = []
+    mock_platform.list_workflows.return_value = []
+    mock_platform.agent_cards.return_value = []
+    # Async methods
+    mock_platform.boot = AsyncMock()
+    mock_platform.shutdown = AsyncMock()
+    mock_platform.run_workflow = AsyncMock()
+
+    with patch("pyflow.server.PyFlowPlatform") as MockPlatform:
+        MockPlatform.return_value = mock_platform
+
+        from pyflow.server import app
+
+        # Inject mock platform directly into app state (bypasses lifespan)
+        app.state.platform = mock_platform
+
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.get("/health")
-        assert response.status_code == 200
-        assert response.json()["status"] == "ok"
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            ac._mock_platform = mock_platform
+            yield ac
 
-    async def test_list_workflows(self):
-        app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.get("/workflows")
-        assert response.status_code == 200
-        assert len(response.json()) >= 1
+        # Clean up state
+        if hasattr(app.state, "platform"):
+            del app.state.platform
 
-    async def test_trigger_workflow_with_non_network_workflow(self):
-        """Trigger multi-step-test which uses condition+transform nodes (no HTTP)."""
-        app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/trigger/multi-step-test")
+
+class TestHealth:
+    async def test_health_endpoint(self, client: AsyncClient):
+        response = await client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert "run_id" in data
-        assert "results" in data
-        assert data["results"]["start"] == "ok"
+        assert data["status"] == "ok"
+        assert data["booted"] is True
 
-    async def test_trigger_nonexistent_workflow_returns_404(self):
-        app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/trigger/nonexistent-workflow")
+
+class TestTools:
+    async def test_list_tools_empty(self, client: AsyncClient):
+        response = await client.get("/api/tools")
+        assert response.status_code == 200
+        assert response.json() == {"tools": []}
+
+    async def test_list_tools_with_data(self, client: AsyncClient):
+        tools = [
+            ToolMetadata(name="http_request", description="Make HTTP requests", tags=["http"]),
+            ToolMetadata(name="transform", description="Transform data"),
+        ]
+        client._mock_platform.list_tools.return_value = tools
+
+        response = await client.get("/api/tools")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["tools"]) == 2
+        assert data["tools"][0]["name"] == "http_request"
+        assert data["tools"][0]["description"] == "Make HTTP requests"
+        assert data["tools"][0]["tags"] == ["http"]
+        assert data["tools"][1]["name"] == "transform"
+
+
+class TestWorkflows:
+    async def test_list_workflows_empty(self, client: AsyncClient):
+        response = await client.get("/api/workflows")
+        assert response.status_code == 200
+        assert response.json() == {"workflows": []}
+
+    async def test_list_workflows_with_data(self, client: AsyncClient):
+        wf = _make_workflow()
+        client._mock_platform.list_workflows.return_value = [wf]
+
+        response = await client.get("/api/workflows")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["workflows"]) == 1
+        assert data["workflows"][0]["name"] == "test-wf"
+
+    async def test_run_workflow_success(self, client: AsyncClient):
+        client._mock_platform.run_workflow.return_value = {"output": "done"}
+
+        response = await client.post(
+            "/api/workflows/test/run",
+            json={"message": "hello", "data": {}},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["result"] == {"output": "done"}
+        client._mock_platform.run_workflow.assert_awaited_once_with(
+            "test", {"message": "hello", "data": {}}
+        )
+
+    async def test_run_workflow_not_found(self, client: AsyncClient):
+        client._mock_platform.run_workflow.side_effect = KeyError("test")
+
+        response = await client.post(
+            "/api/workflows/test/run",
+            json={"message": "", "data": {}},
+        )
         assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
 
-    async def test_error_response_no_internal_details(self):
-        app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/trigger/nonexistent-workflow")
+    async def test_run_workflow_internal_error(self, client: AsyncClient):
+        client._mock_platform.run_workflow.side_effect = RuntimeError("boom")
+
+        response = await client.post(
+            "/api/workflows/test/run",
+            json={"message": "", "data": {}},
+        )
+        assert response.status_code == 500
         data = response.json()
-        assert "detail" in data
-        # Should not leak stack traces or internal paths
-        assert "Traceback" not in data["detail"]
+        assert "internal" in data["detail"].lower()
+        # Should not leak the actual error message
+        assert "boom" not in data["detail"]
 
 
-class TestServerAuth:
-    async def test_trigger_returns_401_without_api_key(self):
-        with patch.dict(os.environ, {"PYFLOW_API_KEY": "secret-key-123"}):
-            app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post("/trigger/multi-step-test")
-        assert response.status_code == 401
+class TestA2A:
+    async def test_agent_cards_endpoint(self, client: AsyncClient):
+        client._mock_platform.agent_cards.return_value = [
+            {"name": "test-wf", "url": "http://localhost:8000/a2a/test-wf"}
+        ]
 
-    async def test_trigger_succeeds_with_correct_api_key(self):
-        with patch.dict(os.environ, {"PYFLOW_API_KEY": "secret-key-123"}):
-            app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post(
-                "/trigger/multi-step-test",
-                headers={"Authorization": "Bearer secret-key-123"},
-            )
+        response = await client.get("/.well-known/agent-card.json")
         assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "test-wf"
 
-    async def test_trigger_returns_401_with_wrong_api_key(self):
-        with patch.dict(os.environ, {"PYFLOW_API_KEY": "secret-key-123"}):
-            app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post(
-                "/trigger/multi-step-test",
-                headers={"Authorization": "Bearer wrong-key"},
-            )
-        assert response.status_code == 401
+    async def test_a2a_execute_success(self, client: AsyncClient):
+        client._mock_platform.run_workflow.return_value = {"output": "a2a result"}
 
-    async def test_health_works_without_api_key(self):
-        with patch.dict(os.environ, {"PYFLOW_API_KEY": "secret-key-123"}):
-            app = create_app(FIXTURES)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.get("/health")
+        response = await client.post(
+            "/a2a/test-wf",
+            json={"message": "run it", "data": {}},
+        )
         assert response.status_code == 200
-        assert response.json()["status"] == "ok"
+        data = response.json()
+        assert data["result"] == {"output": "a2a result"}
+
+    async def test_a2a_execute_not_found(self, client: AsyncClient):
+        client._mock_platform.run_workflow.side_effect = KeyError("test-wf")
+
+        response = await client.post(
+            "/a2a/unknown-wf",
+            json={"message": "", "data": {}},
+        )
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    async def test_a2a_execute_internal_error(self, client: AsyncClient):
+        client._mock_platform.run_workflow.side_effect = RuntimeError("kaboom")
+
+        response = await client.post(
+            "/a2a/test-wf",
+            json={"message": "", "data": {}},
+        )
+        assert response.status_code == 500
+        data = response.json()
+        assert "internal" in data["detail"].lower()
+        assert "kaboom" not in data["detail"]
