@@ -129,8 +129,13 @@ def serve(
     ),
 ) -> None:
     """Start the FastAPI server."""
+    import os
+
     import uvicorn
 
+    os.environ["PYFLOW_HOST"] = host
+    os.environ["PYFLOW_PORT"] = str(port)
+    os.environ["PYFLOW_WORKFLOWS_DIR"] = workflows_dir
     uvicorn.run("pyflow.server:app", host=host, port=port, reload=False)
 
 
