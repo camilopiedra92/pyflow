@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
+import yaml
 from pydantic import BaseModel, model_validator
 
 from pyflow.models.agent import AgentConfig
@@ -169,3 +171,11 @@ class WorkflowDef(BaseModel):
             )
 
         return self
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> WorkflowDef:
+        """Load and validate a YAML file into a WorkflowDef."""
+        if not path.exists():
+            raise FileNotFoundError(f"Workflow file not found: {path}")
+        data = yaml.safe_load(path.read_text())
+        return cls(**data)
