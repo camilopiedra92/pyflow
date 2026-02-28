@@ -80,14 +80,22 @@ class TestPlatformIntegration:
 
 class TestWorkflowValidation:
     async def test_validate_exchange_tracker_workflow(self):
-        """exchange_tracker.yaml is valid and parses correctly."""
+        """exchange_tracker.yaml is valid and uses mixed agent types."""
         path = Path("workflows/exchange_tracker.yaml")
         assert path.exists()
         data = yaml.safe_load(path.read_text())
         workflow = WorkflowDef(**data)
         assert workflow.name == "exchange_tracker"
-        assert len(workflow.agents) == 2
+        assert len(workflow.agents) == 7
         assert workflow.orchestration.type == "sequential"
+        agent_types = {a.name: a.type for a in workflow.agents}
+        assert agent_types["parser"] == "llm"
+        assert agent_types["parse_params"] == "code"
+        assert agent_types["build_url"] == "expr"
+        assert agent_types["fetcher"] == "tool"
+        assert agent_types["extract_rate"] == "expr"
+        assert agent_types["check_threshold"] == "expr"
+        assert agent_types["reporter"] == "llm"
 
     async def test_validate_example_workflow(self):
         """example.yaml is valid and parses correctly."""

@@ -2,35 +2,81 @@ name: exchange_tracker
 description: "Track exchange rates between any currency pair and alert on thresholds"
 
 agents:
-  - name: fetcher
+  # Step 1: LLM parses user intent into structured JSON
+  - name: parser
     type: llm
     model: gemini-2.5-flash
     instruction: >
-      You are an exchange rate assistant. When the user asks about an exchange rate
-      between two currencies, use the http_request tool to fetch the latest rates.
-      The API endpoint is https://open.er-api.com/v6/latest/ followed by the base
-      currency code (e.g. https://open.er-api.com/v6/latest/USD for US dollars).
-      Extract the target currency rate from the JSON response and return it clearly.
-    tools:
-      - http_request
-    output_key: rate_data
+      Extract the currency pair from the user's message. Return ONLY a JSON object
+      with these fields (no other text):
+        {"base": "USD", "target": "EUR", "threshold": null}
+      - base: the source currency code (3-letter ISO, e.g. USD, EUR, GBP)
+      - target: the target currency code
+      - threshold: a numeric threshold if the user mentioned one, otherwise null
+      Examples:
+        "What's the USD to EUR rate?" → {"base": "USD", "target": "EUR", "threshold": null}
+        "Is GBP to JPY above 190?" → {"base": "GBP", "target": "JPY", "threshold": 190}
+    output_key: parsed_input
 
-  - name: analyzer
+  # Step 2: CodeAgent parses JSON string into a dict
+  - name: parse_params
+    type: code
+    function: workflows.helpers.parse_currency_request
+    input_keys: [parsed_input]
+    output_key: params
+
+  # Step 3: ExprAgent builds the API URL from params
+  - name: build_url
+    type: expr
+    expression: "'https://open.er-api.com/v6/latest/' + params['base']"
+    input_keys: [params]
+    output_key: fetch_url
+
+  # Step 4: ToolAgent makes deterministic HTTP call
+  - name: fetcher
+    type: tool
+    tool: http_request
+    tool_config:
+      url: "{fetch_url}"
+      method: GET
+    output_key: api_response
+
+  # Step 5: ExprAgent extracts the specific rate
+  - name: extract_rate
+    type: expr
+    expression: "api_response.get('body', {}).get('rates', {}).get(params['target'])"
+    input_keys: [api_response, params]
+    output_key: rate
+
+  # Step 6: ExprAgent checks threshold if provided
+  - name: check_threshold
+    type: expr
+    expression: "rate > params['threshold'] if params.get('threshold') is not None and rate is not None else None"
+    input_keys: [rate, params]
+    output_key: threshold_exceeded
+
+  # Step 7: LLM generates human-readable report
+  - name: reporter
     type: llm
     model: gemini-2.5-flash
     instruction: >
-      Analyze the exchange rate from {rate_data}. Provide a clear summary including
-      the currency pair, the current rate, and the timestamp. If the user mentioned
-      a threshold, evaluate whether the rate exceeds it and note that in your response.
-    tools:
-      - condition
+      Generate a concise exchange rate summary.
+      Parameters: {params}
+      Current rate: {rate}
+      Threshold exceeded: {threshold_exceeded}
+      Include the currency pair, the rate, and if a threshold was set, whether it was exceeded.
     output_key: analysis
 
 orchestration:
   type: sequential
   agents:
+    - parser
+    - parse_params
+    - build_url
     - fetcher
-    - analyzer
+    - extract_rate
+    - check_threshold
+    - reporter
 
 runtime:
   session_service: in_memory
