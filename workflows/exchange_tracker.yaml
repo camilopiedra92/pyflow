@@ -4,7 +4,7 @@ description: "Track USD/MXN exchange rate and alert on thresholds"
 agents:
   - name: fetcher
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "You are an exchange rate assistant. Use the http_request tool to fetch the current USD/MXN rate from a public API. Return the rate as a number."
     tools:
       - http_request
@@ -12,7 +12,7 @@ agents:
 
   - name: analyzer
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Analyze the exchange rate from {rate_data}. If the rate is above 20, use the alert tool to send a notification. Always respond with a summary."
     tools:
       - condition

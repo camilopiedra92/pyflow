@@ -4,7 +4,7 @@ description: "Example workflow that processes data with condition checks"
 agents:
   - name: checker
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Check the input and confirm it is valid. Return a summary of the input."
     tools:
       - condition
@@ -12,7 +12,7 @@ agents:
 
   - name: transformer
     type: llm
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     instruction: "Transform the validated data from {check_result} using JSONPath. Return the transformed result."
     tools:
       - transform
