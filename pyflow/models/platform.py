@@ -20,7 +20,7 @@ class PlatformConfig(BaseSettings):
     )
 
     tools_dir: str = "pyflow/tools"
-    workflows_dir: str = "workflows"
+    workflows_dir: str = "pyflow/agents"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)

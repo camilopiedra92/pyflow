@@ -49,8 +49,8 @@ class TestPlatformIntegration:
         await platform.shutdown()
 
     async def test_agent_cards_generated(self):
-        """A2A agent cards generated from workflow registry."""
-        config = PlatformConfig(workflows_dir="workflows")
+        """A2A agent cards loaded from agent package directories."""
+        config = PlatformConfig(workflows_dir="pyflow/agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
         cards = platform.agent_cards()
