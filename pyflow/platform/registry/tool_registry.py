@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from google.adk.tools import FunctionTool
 from google.adk.tools.exit_loop_tool import exit_loop
 
 from pyflow.models.tool import ToolMetadata
+from pyflow.platform.openapi_auth import resolve_openapi_auth
 from pyflow.tools.base import BasePlatformTool
+
+if TYPE_CHECKING:
+    from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
+
+    from pyflow.models.agent import OpenApiToolConfig
 
 # ADK built-in tools available by name in workflow YAML.
 # Most are pre-instantiated tool objects (not FunctionTool), returned directly via lazy import.
@@ -42,6 +50,7 @@ class ToolRegistry:
 
     def __init__(self) -> None:
         self._tools: dict[str, type[BasePlatformTool]] = {}
+        self._openapi_tools: dict[str, OpenAPIToolset] = {}
 
     def discover(self) -> None:
         """Import pyflow.tools to trigger auto-registration, then collect all registered tools."""
@@ -54,6 +63,34 @@ class ToolRegistry:
     def register(self, tool_cls: type[BasePlatformTool]) -> None:
         """Manually register a tool class."""
         self._tools[tool_cls.name] = tool_cls
+
+    def register_openapi_tools(
+        self, configs: dict[str, OpenApiToolConfig], base_dir: Path
+    ) -> None:
+        """Pre-build OpenAPIToolset instances from workflow-level configs.
+
+        Each config is keyed by tool name (e.g. 'ynab') and contains the spec
+        path and auth settings. The spec is read once and the toolset is cached
+        for resolution via get_tool_union().
+        """
+        from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import (
+            OpenAPIToolset,
+        )
+
+        for name, cfg in configs.items():
+            spec_path = base_dir / cfg.spec
+            spec_str = spec_path.read_text()
+            spec_type = "json" if spec_path.suffix == ".json" else "yaml"
+            auth_scheme, auth_credential = resolve_openapi_auth(cfg.auth)
+            kwargs: dict = {
+                "spec_str": spec_str,
+                "spec_str_type": spec_type,
+            }
+            if auth_scheme is not None:
+                kwargs["auth_scheme"] = auth_scheme
+            if auth_credential is not None:
+                kwargs["auth_credential"] = auth_credential
+            self._openapi_tools[name] = OpenAPIToolset(**kwargs)
 
     def get(self, name: str) -> BasePlatformTool:
         """Get a tool instance by name. Raises KeyError if not found."""
@@ -75,6 +112,21 @@ class ToolRegistry:
             return self._resolve_fqn_tool(name)
         raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
 
+    def get_tool_union(self, name: str):
+        """Resolve a tool name to an ADK-compatible tool (FunctionTool or BaseToolset).
+
+        4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
+        """
+        if name in self._tools:
+            return self._tools[name]().as_function_tool()
+        if name in self._openapi_tools:
+            return self._openapi_tools[name]
+        if name in _ADK_BUILTIN_TOOLS:
+            return _ADK_BUILTIN_TOOLS[name]()
+        if "." in name:
+            return self._resolve_fqn_tool(name)
+        raise KeyError(f"Unknown tool: '{name}'. Available: {self.all_tool_names()}")
+
     @staticmethod
     def _resolve_fqn_tool(fqn: str) -> FunctionTool:
         """Resolve a fully-qualified Python name to an ADK FunctionTool."""
@@ -86,15 +138,19 @@ class ToolRegistry:
         raise KeyError(f"FQN '{fqn}' does not resolve to a callable.")
 
     def resolve_tools(self, names: list[str]) -> list:
-        """Batch resolve tool names to ADK FunctionTools."""
-        return [self.get_function_tool(n) for n in names]
+        """Batch resolve tool names to ADK tools (FunctionTool or BaseToolset)."""
+        return [self.get_tool_union(n) for n in names]
+
+    def all_tool_names(self) -> list[str]:
+        """Return all registered tool names (custom + OpenAPI)."""
+        return sorted(set(self._tools) | set(self._openapi_tools))
 
     def list_tools(self) -> list[ToolMetadata]:
         """Return metadata for all registered tools."""
         return [cls.metadata() for cls in self._tools.values()]
 
     def __len__(self) -> int:
-        return len(self._tools)
+        return len(self._tools) + len(self._openapi_tools)
 
     def __contains__(self, name: str) -> bool:
-        return name in self._tools
+        return name in self._tools or name in self._openapi_tools

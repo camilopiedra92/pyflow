@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from pyflow.models.a2a import AgentCard
+from pyflow.models.agent import OpenApiToolConfig
 from pyflow.models.platform import PlatformConfig
 from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
-from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.app import PyFlowPlatform
 from pyflow.tools.base import get_secret, clear_secrets
 
@@ -67,15 +67,59 @@ async def test_boot_lifecycle() -> None:
 
     p.tools.discover = MagicMock()
     p.workflows.discover = MagicMock()
+    p.workflows.all = MagicMock(return_value=[])
     p.workflows.hydrate = MagicMock()
 
     await p.boot()
 
     p.tools.discover.assert_called_once()
     p.workflows.discover.assert_called_once_with(Path(p.config.workflows_dir))
-    p.workflows.hydrate.assert_called_once_with(
-        p.tools, project_root=Path(p.config.workflows_dir).parent
+    p.workflows.all.assert_called_once()
+    p.workflows.hydrate.assert_called_once_with(p.tools)
+
+
+@pytest.mark.asyncio
+async def test_boot_registers_openapi_tools() -> None:
+    """boot() registers OpenAPI tools from workflows before hydration."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    openapi_configs = {"ynab": OpenApiToolConfig(spec="specs/ynab.yaml")}
+    fake_hw = MagicMock()
+    fake_hw.definition.openapi_tools = openapi_configs
+
+    p.tools.discover = MagicMock()
+    p.tools.register_openapi_tools = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.all = MagicMock(return_value=[fake_hw])
+    p.workflows.hydrate = MagicMock()
+
+    await p.boot()
+
+    # base_dir should be project_root (parent of workflows_dir)
+    expected_base = Path(p.config.workflows_dir).parent
+    p.tools.register_openapi_tools.assert_called_once_with(
+        openapi_configs, expected_base
     )
+
+
+@pytest.mark.asyncio
+async def test_boot_skips_workflows_without_openapi_tools() -> None:
+    """boot() skips workflows that have no openapi_tools."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    fake_hw = MagicMock()
+    fake_hw.definition.openapi_tools = {}
+    fake_hw.package_dir = Path("/fake/agents/example")
+
+    p.tools.discover = MagicMock()
+    p.tools.register_openapi_tools = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.all = MagicMock(return_value=[fake_hw])
+    p.workflows.hydrate = MagicMock()
+
+    await p.boot()
+
+    p.tools.register_openapi_tools.assert_not_called()
 
 
 @pytest.mark.asyncio

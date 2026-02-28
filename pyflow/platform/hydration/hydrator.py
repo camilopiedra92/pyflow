@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
@@ -11,7 +10,6 @@ from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.planners import BuiltInPlanner, PlanReActPlanner
 from google.adk.tools.agent_tool import AgentTool
-from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 from google.genai import types
 
 from pyflow.models.agent import AgentConfig
@@ -38,57 +36,6 @@ def _get_litellm():
     return LiteLlm
 
 
-def _resolve_openapi_auth(auth):
-    """Map OpenApiAuthConfig to ADK auth_scheme + auth_credential.
-
-    Returns (auth_scheme, auth_credential) tuple. Both are None for type='none'.
-    """
-    match auth.type:
-        case "none":
-            return None, None
-        case "bearer":
-            from google.adk.tools.openapi_tool.auth.auth_helpers import (
-                token_to_scheme_credential,
-            )
-
-            token = os.environ.get(auth.token_env or "", "")
-            return token_to_scheme_credential(
-                "oauth2Token", "header", "Authorization", token
-            )
-        case "apikey":
-            from google.adk.tools.openapi_tool.auth.auth_helpers import (
-                token_to_scheme_credential,
-            )
-
-            key = os.environ.get(auth.token_env or "", "")
-            return token_to_scheme_credential(
-                "apikey", auth.apikey_location, auth.apikey_name, key
-            )
-        case "oauth2":
-            from fastapi.openapi.models import OAuth2, OAuthFlowAuthorizationCode, OAuthFlows
-            from google.adk.auth import AuthCredential, AuthCredentialTypes, OAuth2Auth
-
-            auth_scheme = OAuth2(
-                flows=OAuthFlows(
-                    authorizationCode=OAuthFlowAuthorizationCode(
-                        authorizationUrl=auth.authorization_url or "",
-                        tokenUrl=auth.token_url or "",
-                        scopes=auth.scopes or {},
-                    )
-                )
-            )
-            auth_credential = AuthCredential(
-                auth_type=AuthCredentialTypes.OAUTH2,
-                oauth2=OAuth2Auth(
-                    client_id=os.environ.get(auth.client_id_env or "", ""),
-                    client_secret=os.environ.get(auth.client_secret_env or "", ""),
-                ),
-            )
-            return auth_scheme, auth_credential
-        case _:
-            return None, None
-
-
 class WorkflowHydrator:
     """Converts a WorkflowDef into an ADK agent tree.
 
@@ -100,9 +47,8 @@ class WorkflowHydrator:
     parallel, or loop), callbacks, and planners.
     """
 
-    def __init__(self, tool_registry: ToolRegistry, base_dir: Path | None = None) -> None:
+    def __init__(self, tool_registry: ToolRegistry) -> None:
         self._tool_registry = tool_registry
-        self._base_dir = base_dir or Path(".")
 
     def hydrate(self, workflow: WorkflowDef) -> BaseAgent:
         """Convert WorkflowDef into an ADK agent tree. Returns root ADK BaseAgent."""
@@ -151,22 +97,6 @@ class WorkflowHydrator:
         """Build an LlmAgent with resolved tools, model, and optional callbacks."""
         model: Union[str, BaseLlm] = self._resolve_model(config.model)
         tools = self._tool_registry.resolve_tools(config.tools) if config.tools else []
-
-        # Resolve OpenAPI toolsets
-        for openapi_cfg in config.openapi_tools:
-            spec_path = self._base_dir / openapi_cfg.spec
-            spec_str = spec_path.read_text()
-            spec_type = "json" if spec_path.suffix == ".json" else "yaml"
-            auth_scheme, auth_credential = _resolve_openapi_auth(openapi_cfg.auth)
-            kwargs_openapi: dict = {
-                "spec_str": spec_str,
-                "spec_str_type": spec_type,
-            }
-            if auth_scheme is not None:
-                kwargs_openapi["auth_scheme"] = auth_scheme
-            if auth_credential is not None:
-                kwargs_openapi["auth_credential"] = auth_credential
-            tools.append(OpenAPIToolset(**kwargs_openapi))
 
         callbacks = self._resolve_callbacks(config.callbacks)
 
@@ -405,5 +335,7 @@ def build_root_agent(caller_file: str) -> BaseAgent:
     tools = ToolRegistry()
     tools.discover()
     workflow = WorkflowDef.from_yaml(workflow_path)
-    hydrator = WorkflowHydrator(tools, base_dir=project_root)
+    if workflow.openapi_tools:
+        tools.register_openapi_tools(workflow.openapi_tools, project_root)
+    hydrator = WorkflowHydrator(tools)
     return hydrator.hydrate(workflow)

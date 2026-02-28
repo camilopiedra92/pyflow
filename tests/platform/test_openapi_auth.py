@@ -4,13 +4,13 @@ import os
 from unittest.mock import patch
 
 from pyflow.models.agent import OpenApiAuthConfig
-from pyflow.platform.openapi_auth import resolve_openapi_auth as _resolve_openapi_auth
+from pyflow.platform.openapi_auth import resolve_openapi_auth
 
 
 class TestResolveOpenApiAuthNone:
     def test_none_returns_none_tuple(self):
         auth = OpenApiAuthConfig(type="none")
-        scheme, credential = _resolve_openapi_auth(auth)
+        scheme, credential = resolve_openapi_auth(auth)
         assert scheme is None
         assert credential is None
 
@@ -19,14 +19,14 @@ class TestResolveOpenApiAuthBearer:
     def test_bearer_returns_http_scheme(self):
         auth = OpenApiAuthConfig(type="bearer", token_env="TEST_TOKEN")
         with patch.dict(os.environ, {"TEST_TOKEN": "my-secret-token"}):
-            scheme, credential = _resolve_openapi_auth(auth)
+            scheme, credential = resolve_openapi_auth(auth)
         assert scheme is not None
         assert credential is not None
 
     def test_bearer_missing_env_returns_empty_token(self):
         auth = OpenApiAuthConfig(type="bearer", token_env="MISSING_VAR")
         with patch.dict(os.environ, {}, clear=True):
-            scheme, credential = _resolve_openapi_auth(auth)
+            scheme, credential = resolve_openapi_auth(auth)
         assert scheme is not None
 
 
@@ -39,7 +39,7 @@ class TestResolveOpenApiAuthApiKey:
             apikey_name="api_key",
         )
         with patch.dict(os.environ, {"TEST_API_KEY": "key123"}):
-            scheme, credential = _resolve_openapi_auth(auth)
+            scheme, credential = resolve_openapi_auth(auth)
         assert scheme is not None
         assert credential is not None
 
@@ -56,6 +56,6 @@ class TestResolveOpenApiAuthOAuth2:
         )
         env = {"TEST_CLIENT_ID": "id123", "TEST_CLIENT_SECRET": "secret456"}
         with patch.dict(os.environ, env):
-            scheme, credential = _resolve_openapi_auth(auth)
+            scheme, credential = resolve_openapi_auth(auth)
         assert scheme is not None
         assert credential is not None

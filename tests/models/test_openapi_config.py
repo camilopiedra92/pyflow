@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pyflow.models.agent import AgentConfig, OpenApiAuthConfig, OpenApiToolConfig
+from pyflow.models.agent import OpenApiAuthConfig, OpenApiToolConfig
 
 
 class TestOpenApiAuthConfig:
@@ -59,25 +59,3 @@ class TestOpenApiToolConfig:
         assert config.auth.type == "bearer"
 
 
-class TestAgentConfigOpenApiTools:
-    def test_default_empty(self):
-        agent = AgentConfig(
-            name="test", type="llm", model="gemini-2.5-flash", instruction="Do stuff"
-        )
-        assert agent.openapi_tools == []
-
-    def test_with_openapi_tools(self):
-        agent = AgentConfig(
-            name="test",
-            type="llm",
-            model="gemini-2.5-flash",
-            instruction="Do stuff",
-            openapi_tools=[
-                OpenApiToolConfig(
-                    spec="specs/ynab.json",
-                    auth=OpenApiAuthConfig(type="bearer", token_env="TOKEN"),
-                )
-            ],
-        )
-        assert len(agent.openapi_tools) == 1
-        assert agent.openapi_tools[0].auth.type == "bearer"

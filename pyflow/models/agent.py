@@ -61,8 +61,6 @@ class AgentConfig(BaseModel):
     expression: str | None = None
     # AgentTool fields
     agent_tools: list[str] | None = None
-    # OpenAPI tools
-    openapi_tools: list[OpenApiToolConfig] = []
 
     @model_validator(mode="after")
     def _validate_by_type(self) -> AgentConfig:

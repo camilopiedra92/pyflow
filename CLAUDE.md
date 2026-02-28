@@ -42,7 +42,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 ## Architecture
 
 - `pyflow/platform/app.py` — PyFlowPlatform orchestrator (boot with .env loading, shutdown, run_workflow lifecycle)
-- `pyflow/platform/registry/tool_registry.py` — ToolRegistry: auto-discover + register tools
+- `pyflow/platform/registry/tool_registry.py` — ToolRegistry: auto-discover + register tools (custom + OpenAPI)
 - `pyflow/platform/registry/workflow_registry.py` — WorkflowRegistry: discover + hydrate YAML workflows
 - `pyflow/platform/registry/discovery.py` — Filesystem scanner for agent packages
 - `pyflow/platform/hydration/hydrator.py` — WorkflowHydrator: YAML -> Pydantic -> ADK Agent tree; `build_root_agent()` factory for agent packages
@@ -55,9 +55,10 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/condition.py` — ConditionTool (AST-validated safe eval)
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
-- `pyflow/models/workflow.py` — WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
+- `pyflow/platform/openapi_auth.py` — resolve_openapi_auth: OpenAPI auth config to ADK auth scheme/credential
+- `pyflow/models/workflow.py` — WorkflowDef (with openapi_tools), OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
-- `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools, openapi_tools), OpenApiAuthConfig, OpenApiToolConfig
+- `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools), OpenApiAuthConfig, OpenApiToolConfig
 - `pyflow/models/tool.py` — ToolMetadata
 - `pyflow/platform/callbacks.py` — FQN-based callback resolution via `importlib` (Python dotted paths like `mypackage.callbacks.log_request`)
 - `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone, cors_origins, telemetry)
@@ -72,7 +73,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__` — no manual registration needed
 - Each tool defines `name`, `description` class vars + async `execute()` with typed parameters
 - `as_function_tool()` converts any platform tool to an ADK `FunctionTool`
-- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`, plus optional `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`, `openapi_tools`), `orchestration`, and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
+- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`, plus optional `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`), `orchestration`, optional `openapi_tools` (workflow-level dict of named OpenAPI specs), and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
 - `expr` agents evaluate safe Python expressions inline (AST-validated, restricted builtins, no imports/IO) — reuses sandbox from ConditionTool
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees
 - Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm (lazy-loaded via `@lru_cache`)
@@ -94,7 +95,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Executor injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session state
 - Executor wraps agent in ADK `App` model (`Runner(app=app)` instead of `Runner(agent=agent)`) — unlocks context caching, event compaction, resumability, app-level plugins
 - RuntimeConfig supports `context_cache_intervals/ttl/min_tokens` (Gemini 2.0+ context caching), `compaction_interval/overlap` (long conversation compaction), `resumable` (session resumability), `credential_service` (`in_memory` or `none`), `session_db_path` (SQLite path), `mcp_servers` (MCP server connections)
-- `openapi_tools` on AgentConfig: each LLM agent can declare OpenAPI specs with auth; hydrator creates ADK `OpenAPIToolset` at hydration time and injects generated tools into the agent
+- `openapi_tools` on WorkflowDef: workflow-level dict of named OpenAPI specs with auth; ToolRegistry pre-builds `OpenAPIToolset` instances at boot, agents reference by name via `tools: [ynab]`
 - Callbacks resolved via Python FQN (fully-qualified names) through `importlib` — e.g. `before_agent: "mypackage.callbacks.log_request"`. No manual registry needed
 - Plugin registry includes 7 ADK plugins: `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics` (requires `PYFLOW_BQ_PROJECT_ID`/`PYFLOW_BQ_DATASET_ID` env vars)
 - CORS middleware opt-in via `PlatformConfig.cors_origins` (env: `PYFLOW_CORS_ORIGINS`)
@@ -105,7 +106,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `agents/example/` — simple sequential workflow (condition + transform tools, description + temperature)
 - `agents/exchange_tracker/` — 7-step pipeline: LLM (output_schema) → code → expr → tool → expr → expr → LLM (temperature)
-- `agents/budget_analyst/` — ReAct agent with PlanReAct planner, YNAB OpenAPI tools (description, temperature, max_output_tokens)
+- `agents/budget_analyst/` — ReAct agent with PlanReAct planner, YNAB OpenAPI tools via `tools: [ynab]` (description, temperature, max_output_tokens)
 
 Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `build_root_agent()` factory), `workflow.yaml` (definition + optional `a2a:` section for A2A discovery). Use `pyflow init <name>` to scaffold new packages.
 
