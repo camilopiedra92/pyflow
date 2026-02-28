@@ -13,19 +13,6 @@ from pyflow.models.platform import PlatformConfig
 app = typer.Typer(name="pyflow", help="PyFlow ADK Platform")
 logger = structlog.get_logger()
 
-
-def _ensure_dotenv() -> None:
-    """Load .env into os.environ for third-party SDKs.
-
-    Google Gemini SDK, LiteLLM, etc. read API keys (GOOGLE_API_KEY,
-    ANTHROPIC_API_KEY) directly from os.environ. pydantic-settings only
-    loads PYFLOW_* prefixed vars into PlatformConfig but does NOT export
-    non-prefixed vars to the process environment.
-    """
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
 _INIT_AGENT_PY = '''\
 """{name} — ADK-compatible agent package."""
 from __future__ import annotations
@@ -199,12 +186,5 @@ def init(
 
 
 def main() -> None:
-    """CLI entrypoint — loads .env then runs the Typer app.
-
-    Third-party SDKs (Google Gemini, LiteLLM) read API keys directly from
-    os.environ. pydantic-settings only loads PYFLOW_* prefixed vars into
-    PlatformConfig but does NOT export non-prefixed vars like GOOGLE_API_KEY.
-    Loading .env here (not at import time) avoids polluting os.environ during tests.
-    """
-    _ensure_dotenv()
+    """CLI entrypoint."""
     app()

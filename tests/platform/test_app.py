@@ -21,8 +21,8 @@ from pyflow.tools.base import get_secret, clear_secrets
 
 @pytest.fixture
 def platform() -> PyFlowPlatform:
-    """A default platform instance (not booted)."""
-    return PyFlowPlatform()
+    """A default platform instance (not booted, dotenv disabled for test isolation)."""
+    return PyFlowPlatform(PlatformConfig(load_dotenv=False))
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def custom_config() -> PlatformConfig:
 
 
 def test_init_defaults(platform: PyFlowPlatform) -> None:
-    assert platform.config == PlatformConfig()
+    assert platform.config == PlatformConfig(load_dotenv=False)
     assert platform.tools is not None
     assert platform.workflows is not None
     assert platform.executor is not None
@@ -63,7 +63,7 @@ def test_init_custom_config(custom_config: PlatformConfig) -> None:
 
 @pytest.mark.asyncio
 async def test_boot_lifecycle() -> None:
-    p = PyFlowPlatform()
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
 
     p.tools.discover = MagicMock()
     p.workflows.discover = MagicMock()
@@ -78,7 +78,7 @@ async def test_boot_lifecycle() -> None:
 
 @pytest.mark.asyncio
 async def test_boot_sets_booted_flag() -> None:
-    p = PyFlowPlatform()
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
 
     p.tools.discover = MagicMock()
     p.workflows.discover = MagicMock()
@@ -227,7 +227,7 @@ class TestBootInjectsSecrets:
 
     @pytest.mark.asyncio
     async def test_boot_calls_set_secrets(self):
-        config = PlatformConfig(secrets={"ynab_api_token": "test-token"})
+        config = PlatformConfig(secrets={"ynab_api_token": "test-token"}, load_dotenv=False)
         p = PyFlowPlatform(config=config)
         p.tools.discover = MagicMock()
         p.workflows.discover = MagicMock()
@@ -239,7 +239,7 @@ class TestBootInjectsSecrets:
 
     @pytest.mark.asyncio
     async def test_boot_without_secrets_is_fine(self):
-        p = PyFlowPlatform()
+        p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
         p.tools.discover = MagicMock()
         p.workflows.discover = MagicMock()
         p.workflows.hydrate = MagicMock()
