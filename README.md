@@ -1,16 +1,17 @@
 # PyFlow
 
-Config-driven workflow automation engine with AI-powered nodes. Define workflows in YAML, execute as async DAGs.
+Agent platform powered by Google ADK. Define multi-agent workflows in YAML, auto-hydrated into ADK agent trees with self-registering tools and A2A protocol support.
 
 ## Features
 
-- **Async DAG Engine** — Topological sort, parallel execution, retry with exponential backoff
-- **7 Built-in Nodes** — HTTP, Transform (JSONPath), Condition, Alert, Storage, LLM
-- **Multi-Provider AI** — Google Gemini, Anthropic Claude, OpenAI GPT via unified `llm` node
-- **Fully Typed** — Pydantic v2 models for all configs, responses, and workflow definitions
-- **Secure** — AST-validated eval, Jinja2 sandbox, SSRF protection, API key auth
-- **Headless API** — FastAPI server with REST endpoints and webhook triggers
-- **164 Tests** — Comprehensive test suite with mocked providers
+- **Google ADK Runtime** -- Workflows become ADK agent trees (Sequential, Parallel, Loop)
+- **Self-Registering Tools** -- Inherit `BasePlatformTool` to auto-register; no decorators needed
+- **5 Built-in Tools** -- HTTP requests, JSONPath transforms, conditions, alerts, file storage
+- **Multi-Model Support** -- Gemini native, Anthropic/OpenAI via LiteLLM
+- **A2A Protocol** -- Auto-generated agent cards with skills metadata for agent discovery
+- **Fully Typed** -- Pydantic v2 models for all configs, responses, and workflow definitions
+- **Secure** -- AST-validated eval, SSRF protection on HTTP tool
+- **221 Tests** -- Comprehensive suite with mocked ADK components
 
 ## Quickstart
 
@@ -19,123 +20,158 @@ Config-driven workflow automation engine with AI-powered nodes. Define workflows
 pip install -e ".[dev]"
 
 # Run a workflow
-pyflow run workflows/example.yaml
+pyflow run exchange_tracker
 
-# Start the server
+# Start the API server
 pyflow serve
 
 # Validate a workflow
-pyflow validate workflows/exchange_rate_tracker.yaml
+pyflow validate workflows/exchange_tracker.yaml
+
+# List tools and workflows
+pyflow list --tools
+pyflow list --workflows
 ```
 
 ## Example Workflow
 
 ```yaml
-name: exchange-rate-tracker
-description: Monitors USDCOP and alerts on significant changes
-trigger:
-  type: schedule
-  config:
-    cron: "0 * * * *"
+name: exchange_tracker
+description: "Track USD/MXN exchange rate and alert on thresholds"
 
-nodes:
-  - id: fetch_rate
-    type: http
-    config:
-      url: "https://open.er-api.com/v6/latest/USD"
-      timeout: 15
+agents:
+  - name: fetcher
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "Fetch the current USD/MXN rate using http_request"
+    tools:
+      - http_request
+    output_key: rate_data
 
-  - id: extract_cop
-    type: transform
-    depends_on: [fetch_rate]
-    config:
-      input: "{{ fetch_rate }}"
-      expression: "$.body.rates.COP"
+  - name: analyzer
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "Analyze the rate from {rate_data}. Alert if above 20."
+    tools:
+      - condition
+      - alert
+    output_key: analysis
 
-  - id: check_change
-    type: condition
-    depends_on: [extract_cop]
-    config:
-      if: "extract_cop > 4000"
+orchestration:
+  type: sequential
+  agents:
+    - fetcher
+    - analyzer
 
-  - id: notify
-    type: alert
-    depends_on: [check_change]
-    when: "check_change == True"
-    config:
-      webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK"
-      message: "USDCOP is now {{ extract_cop }}"
+a2a:
+  version: "1.0.0"
+  skills:
+    - id: rate_tracking
+      name: "Exchange Rate Tracking"
+      description: "Monitor USD/MXN exchange rates"
+      tags: [finance, monitoring, forex]
 ```
 
-## AI-Powered Workflows
+## Multi-Model Support
+
+Use Gemini models natively, or prefix with `anthropic/` or `openai/` for LiteLLM routing:
 
 ```yaml
-- id: classify
-  type: llm
-  config:
-    provider: google          # google | anthropic | openai
-    model: gemini-2.0-flash
-    prompt: "Classify this ticket: {{ ticket.body }}"
-    output_format: json
+agents:
+  - name: classifier
+    type: llm
+    model: gemini-2.0-flash          # Google Gemini (native)
+    instruction: "Classify this input"
+
+  - name: writer
+    type: llm
+    model: anthropic/claude-sonnet-4-20250514  # Anthropic via LiteLLM
+    instruction: "Write a report"
+
+  - name: summarizer
+    type: llm
+    model: openai/gpt-4o             # OpenAI via LiteLLM
+    instruction: "Summarize the report"
 ```
 
-Install AI providers:
+Install LiteLLM for non-Gemini models:
 ```bash
-pip install -e ".[ai]"  # google-genai, anthropic, openai
+pip install -e ".[litellm]"
 ```
 
-## Node Types
+## Platform Tools
 
-| Node | Type | Description |
+| Tool | Name | Description |
 |------|------|-------------|
-| HTTP | `http` | Make HTTP requests (GET, POST, etc.) with timeout and SSRF protection |
+| HTTP | `http_request` | Make HTTP requests with SSRF protection |
 | Transform | `transform` | Extract/transform data using JSONPath expressions |
 | Condition | `condition` | Evaluate boolean expressions with safe eval |
 | Alert | `alert` | Send webhook notifications (Slack, Discord, Teams) |
 | Storage | `storage` | Read/write/append JSON to local files |
-| LLM | `llm` | Multi-provider AI (Google, Anthropic, OpenAI) |
 
 ## Architecture
 
 ```
 pyflow/
-  core/
-    engine.py       — Async DAG executor (topological sort, parallel, retry)
-    models.py       — Pydantic models: WorkflowDef, NodeDef, TriggerDef
-    context.py      — ExecutionContext (node results/errors per run)
-    template.py     — Jinja2 sandboxed template resolution
-    safe_eval.py    — AST-validated expression evaluation
-    loader.py       — YAML workflow loader
-    node.py         — BaseNode[TConfig, TResponse] ABC + NodeRegistry
-  nodes/
-    schemas.py      — Pydantic config/response models for all nodes
-    http.py         — HTTP requests (httpx, SSRF protection)
-    transform.py    — JSONPath transforms (jsonpath-ng)
-    condition.py    — Boolean conditions (safe eval)
-    alert.py        — Webhook alerts
-    storage.py      — JSON file storage
-    llm.py          — Multi-provider LLM node
-  ai/
-    base.py         — LLMConfig, LLMResponse, BaseLLMProvider
-    providers/      — Google, Anthropic, OpenAI implementations
-  server.py         — FastAPI server with auth middleware
-  cli.py            — Typer CLI (run, validate, list, serve)
+  platform/
+    app.py            -- PyFlowPlatform orchestrator (boot/shutdown lifecycle)
+    registry/
+      tool_registry.py    -- Auto-discover + register tools
+      workflow_registry.py -- Discover + hydrate YAML workflows
+      discovery.py         -- Filesystem scanner
+    hydration/
+      hydrator.py       -- YAML -> Pydantic -> ADK Agent tree
+    runner/
+      engine.py         -- PlatformRunner wrapping ADK Runner
+    session/
+      service.py        -- SessionManager wrapping ADK SessionService
+    a2a/
+      cards.py          -- Auto-generate agent-card.json
+  tools/
+    base.py           -- BasePlatformTool ABC + auto-registration
+    http.py           -- HTTP requests (httpx, SSRF protection)
+    transform.py      -- JSONPath transforms (jsonpath-ng)
+    condition.py      -- Boolean conditions (safe eval)
+    alert.py          -- Webhook alerts
+    storage.py        -- JSON file storage
+  models/
+    workflow.py       -- WorkflowDef, OrchestrationConfig, A2AConfig
+    agent.py          -- AgentConfig
+    tool.py           -- ToolMetadata, ToolConfig, ToolResponse
+    platform.py       -- PlatformConfig
+  server.py           -- FastAPI server with REST + A2A endpoints
+  cli.py              -- Typer CLI (run, validate, list, serve)
 ```
 
-## Security
+### Platform Boot Sequence
 
-- **Safe eval** — AST-validated expressions block `__import__`, `exec`, dunder access
-- **Jinja2 sandbox** — `SandboxedEnvironment` prevents template injection
-- **SSRF protection** — Blocks requests to private/internal IP ranges
-- **API key auth** — Optional `PYFLOW_API_KEY` for server endpoints
-- **No secret leaks** — Internal errors return generic messages to clients
+```
+boot() -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
+       -> workflows.discover()   -- scan workflows/, parse YAMLs into WorkflowDef
+       -> workflows.hydrate()    -- resolve tool refs -> build ADK agent trees
+       -> sessions.initialize()  -- create ADK InMemorySessionService
+       -> ready
+```
+
+## A2A Protocol
+
+Workflows with `a2a` config automatically expose agent cards for discovery:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/.well-known/agent-card.json` | GET | A2A agent discovery |
+| `/a2a/{workflow_name}` | POST | A2A execution |
+| `/api/workflows` | GET | List all workflows |
+| `/api/workflows/{name}/run` | POST | REST execution |
+| `/api/tools` | GET | List platform tools |
+| `/health` | GET | Health check |
 
 ## Development
 
 ```bash
 # Setup
 python -m venv .venv
-source .venv/Scripts/activate  # Windows
+source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Run tests
@@ -148,7 +184,7 @@ ruff format .
 
 ## Tech Stack
 
-Python 3.12 | FastAPI | Pydantic v2 | httpx | Jinja2 | jsonpath-ng | structlog | APScheduler | typer
+Python 3.12 | Google ADK | Pydantic v2 | FastAPI | httpx | jsonpath-ng | structlog | typer | LiteLLM
 
 ## License
 
