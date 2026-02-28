@@ -1,19 +1,25 @@
-# workflows/example.yaml
-name: example-webhook-handler
-description: Example workflow that receives a webhook and logs the payload
-trigger:
-  type: manual
-nodes:
-  - id: check-input
-    type: condition
-    config:
-      if: "True"
+name: example
+description: "Example workflow that processes data with condition checks"
 
-  - id: transform-data
-    type: transform
-    depends_on: [check-input]
-    config:
-      input:
-        message: "Hello from PyFlow!"
-        items: [1, 2, 3]
-      expression: "$.message"
+agents:
+  - name: checker
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "Check the input and confirm it is valid. Return a summary of the input."
+    tools:
+      - condition
+    output_key: check_result
+
+  - name: transformer
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "Transform the validated data from {check_result} using JSONPath. Return the transformed result."
+    tools:
+      - transform
+    output_key: transform_result
+
+orchestration:
+  type: sequential
+  agents:
+    - checker
+    - transformer

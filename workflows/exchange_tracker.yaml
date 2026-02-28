@@ -1,0 +1,37 @@
+name: exchange_tracker
+description: "Track USD/MXN exchange rate and alert on thresholds"
+
+agents:
+  - name: fetcher
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "You are an exchange rate assistant. Use the http_request tool to fetch the current USD/MXN rate from a public API. Return the rate as a number."
+    tools:
+      - http_request
+    output_key: rate_data
+
+  - name: analyzer
+    type: llm
+    model: gemini-2.0-flash
+    instruction: "Analyze the exchange rate from {rate_data}. If the rate is above 20, use the alert tool to send a notification. Always respond with a summary."
+    tools:
+      - condition
+      - alert
+    output_key: analysis
+
+orchestration:
+  type: sequential
+  agents:
+    - fetcher
+    - analyzer
+
+a2a:
+  version: "1.0.0"
+  skills:
+    - id: rate_tracking
+      name: "Exchange Rate Tracking"
+      description: "Monitor USD/MXN exchange rates and alert on thresholds"
+      tags:
+        - finance
+        - monitoring
+        - forex
