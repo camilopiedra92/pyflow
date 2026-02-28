@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
 from pyflow.models.a2a import AgentCard
-from pyflow.models.runner import RunResult
+from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 
@@ -180,6 +180,45 @@ class TestWorkflows:
         assert "internal" in data["detail"].lower()
         # Should not leak the actual error message
         assert "boom" not in data["detail"]
+
+
+class TestWorkflowUsage:
+    async def test_run_workflow_includes_usage(self, client: AsyncClient):
+        """RunResult with usage should be included in response."""
+        usage = UsageSummary(
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+            duration_ms=1200,
+            steps=3,
+            llm_calls=2,
+            tool_calls=1,
+            model="gemini-2.5-flash",
+        )
+        run_result = RunResult(content="done", author="agent", usage=usage)
+        client._mock_platform.run_workflow.return_value = run_result
+
+        response = await client.post(
+            "/api/workflows/test/run",
+            json={"message": "hello"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["result"]["usage"]["input_tokens"] == 100
+        assert data["result"]["usage"]["duration_ms"] == 1200
+        assert data["result"]["usage"]["model"] == "gemini-2.5-flash"
+
+    async def test_run_workflow_usage_null_when_absent(self, client: AsyncClient):
+        run_result = RunResult(content="done", author="agent")
+        client._mock_platform.run_workflow.return_value = run_result
+
+        response = await client.post(
+            "/api/workflows/test/run",
+            json={"message": "hello"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["result"]["usage"] is None
 
 
 class TestA2A:

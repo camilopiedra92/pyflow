@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pyflow.models.runner import RunResult
+from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.server import (
     HealthResponse,
     ToolListResponse,
@@ -105,9 +105,18 @@ class TestWorkflowRunResponse:
             WorkflowRunResponse()
 
     def test_serialization(self):
-        result = RunResult(content="hi", author="agent", usage_metadata={"t": 1})
+        usage = UsageSummary(input_tokens=10, output_tokens=5, total_tokens=15)
+        result = RunResult(content="hi", author="agent", usage=usage)
         resp = WorkflowRunResponse(result=result)
         data = resp.model_dump()
         assert data["result"]["content"] == "hi"
         assert data["result"]["author"] == "agent"
-        assert data["result"]["usage_metadata"] == {"t": 1}
+        assert data["result"]["usage"]["input_tokens"] == 10
+        assert data["result"]["usage"]["total_tokens"] == 15
+
+    def test_serialization_usage_none(self):
+        result = RunResult(content="hi", author="agent")
+        resp = WorkflowRunResponse(result=result)
+        data = resp.model_dump()
+        assert data["result"]["content"] == "hi"
+        assert data["result"]["usage"] is None
