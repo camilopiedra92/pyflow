@@ -14,7 +14,7 @@ Every agent in a workflow has a `type` that determines its behavior. There are t
 
 | Type | Purpose | Key Fields |
 |------|---------|------------|
-| `llm` | Calls an LLM with an instruction and optional tools | `model`, `instruction`, `tools`, `output_key` |
+| `llm` | Calls an LLM with an instruction and optional tools | `model`, `instruction`, `tools`, `output_key`, `description`, `temperature`, `output_schema`, `agent_tools` |
 | `code` | Imports and runs a Python function | `function`, `input_keys`, `output_key` |
 | `tool` | Executes a platform tool with fixed config | `tool`, `tool_config`, `output_key` |
 | `expr` | Evaluates a safe Python expression inline | `expression`, `input_keys`, `output_key` |
@@ -171,8 +171,14 @@ Wraps a single LLM agent with a planner for multi-step reasoning. The agent iter
 orchestration:
   type: react
   agent: reasoner
-  planner: plan_react
+  planner: plan_react       # plan_react | builtin
+  planner_config:           # for builtin planner only
+    thinking_budget: 2048
 ```
+
+Supported planners:
+- `plan_react` — PlanReAct: plans filters/steps before executing, good for data-heavy APIs
+- `builtin` — Gemini BuiltInPlanner with native thinking (accepts `planner_config.thinking_budget`)
 
 ### LLM-Routed
 
@@ -244,9 +250,31 @@ agents:
     output_key: summary
 ```
 
-### Pattern: LLM → Code → Expr (Structured LLM Output)
+### Pattern: Structured Output with `output_schema`
 
-LLM agents always write text to state, even if the text is JSON. When you need to use individual fields from an LLM's JSON output in downstream agents, use this pattern:
+The preferred way to enforce structured LLM output is `output_schema`. The LLM is constrained at the API level to produce JSON matching the schema:
+
+```yaml
+- name: parser
+  type: llm
+  model: gemini-2.5-flash
+  instruction: "Extract the currency pair from the user's message"
+  output_key: parsed_input
+  temperature: 0
+  output_schema:
+    type: object
+    properties:
+      base: { type: string }
+      target: { type: string }
+      threshold: { type: number }
+    required: [base, target]
+```
+
+JSON Schema dicts are converted to Pydantic models at hydration time via `json_schema_to_pydantic()`. Supported types: `string`, `integer`, `number`, `boolean`, nested `object`, `array` with typed items, required vs optional fields.
+
+### Pattern: LLM → Code → Expr (Legacy Structured Output)
+
+Without `output_schema`, LLM agents write text to state even if the text is JSON. When you need to use individual fields from an LLM's JSON output in downstream agents, use this pattern:
 
 1. **LLM agent** outputs structured JSON → `state["parsed_input"]` (a string)
 2. **Code agent** parses the JSON string → `state["params"]` (a dict)
@@ -546,6 +574,34 @@ echo 'PYFLOW_YNAB_API_TOKEN=your-token-here' >> .env
 ```
 
 ---
+
+### ADK Built-in Tools
+
+These tools are provided by Google ADK and available by name in any workflow. They are lazy-imported and don't require extra installation.
+
+**Grounding tools** — Gemini 2 models invoke these automatically when listed in `tools:`:
+
+| Tool | Purpose |
+|------|---------|
+| `google_search` | Google Search — gives the LLM access to web search results |
+| `google_maps_grounding` | Google Maps — location-aware grounding for geographic queries |
+| `url_context` | URL content extraction — retrieves and uses content from URLs in the conversation |
+| `enterprise_web_search` | Enterprise-compliant web search grounding |
+
+**Memory & artifact tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `load_memory` | Load relevant memories for the current user (semantic search) |
+| `preload_memory` | Preload all memories at session start |
+| `load_artifacts` | Load artifacts (files, images) into the session |
+
+**Control & interactive tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `exit_loop` | Signal loop completion from within a LoopAgent |
+| `get_user_choice` | Async user interaction — pauses for user input (long-running) |
 
 ### Creating Custom Tools
 
@@ -918,6 +974,18 @@ agents:                              # required, list of agent configs
     model: gemini-2.5-flash
     instruction: "What the LLM should do"
     tools: [http_request, condition]
+    description: "Agent purpose for routing"  # optional
+    include_contents: default        # default | none
+    output_schema:                   # optional, JSON Schema -> enforces structured output
+      type: object
+      properties: { ... }
+      required: [...]
+    input_schema: { ... }            # optional, JSON Schema -> enforces structured input
+    temperature: 0.7                 # optional, generation config
+    max_output_tokens: 4096          # optional
+    top_p: 0.95                      # optional
+    top_k: 40                        # optional
+    agent_tools: [other_agent]       # optional, wraps agents as callable tools
     callbacks:
       before_agent: callback_name
       after_agent: callback_name
@@ -941,7 +1009,9 @@ orchestration:                       # required
       depends_on: [dep1, dep2]
   agent: agent_name                  # for react
   router: agent_name                 # for llm_routed
-  planner: plan_react                # for react
+  planner: plan_react                # for react: plan_react | builtin
+  planner_config:                    # for builtin planner
+    thinking_budget: 2048
   max_iterations: 10                 # for loop
 
 runtime:                             # optional

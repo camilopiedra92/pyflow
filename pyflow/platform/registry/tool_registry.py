@@ -9,11 +9,20 @@ from pyflow.models.tool import ToolMetadata
 from pyflow.tools.base import BasePlatformTool
 
 # ADK built-in tools available by name in workflow YAML.
-# google_search and load_memory are tool instances (not FunctionTool), returned directly.
+# Most are pre-instantiated tool objects (not FunctionTool), returned directly via lazy import.
 _ADK_BUILTIN_TOOLS: dict[str, Callable] = {
     "exit_loop": lambda: FunctionTool(func=exit_loop),
+    # Grounding tools (Gemini invokes automatically when listed in tools)
     "google_search": lambda: _lazy_import_builtin("google.adk.tools", "google_search"),
+    "google_maps_grounding": lambda: _lazy_import_builtin("google.adk.tools", "google_maps_grounding"),
+    "enterprise_web_search": lambda: _lazy_import_builtin("google.adk.tools", "enterprise_web_search"),
+    "url_context": lambda: _lazy_import_builtin("google.adk.tools", "url_context"),
+    # Memory & artifact tools
     "load_memory": lambda: _lazy_import_builtin("google.adk.tools", "load_memory"),
+    "preload_memory": lambda: _lazy_import_builtin("google.adk.tools", "preload_memory"),
+    "load_artifacts": lambda: _lazy_import_builtin("google.adk.tools", "load_artifacts"),
+    # Interactive tools
+    "get_user_choice": lambda: _lazy_import_builtin("google.adk.tools", "get_user_choice"),
 }
 
 

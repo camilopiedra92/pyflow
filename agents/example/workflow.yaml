@@ -5,18 +5,22 @@ agents:
   - name: checker
     type: llm
     model: gemini-2.5-flash
+    description: "Validates input data and produces a summary"
     instruction: "Check the input and confirm it is valid. Return a summary of the input."
     tools:
       - condition
     output_key: check_result
+    temperature: 0
 
   - name: transformer
     type: llm
     model: gemini-2.5-flash
+    description: "Transforms validated data using JSONPath expressions"
     instruction: "Transform the validated data from {check_result} using JSONPath. Return the transformed result."
     tools:
       - transform
     output_key: transform_result
+    temperature: 0
 
 orchestration:
   type: sequential

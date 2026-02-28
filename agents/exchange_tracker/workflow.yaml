@@ -6,10 +6,9 @@ agents:
   - name: parser
     type: llm
     model: gemini-2.5-flash
+    description: "Extracts currency pair and optional threshold from user messages"
     instruction: >
-      Extract the currency pair from the user's message. Return ONLY a JSON object
-      with these fields (no other text):
-        {"base": "USD", "target": "EUR", "threshold": null}
+      Extract the currency pair from the user's message.
       - base: the source currency code (3-letter ISO, e.g. USD, EUR, GBP)
       - target: the target currency code
       - threshold: a numeric threshold if the user mentioned one, otherwise null
@@ -17,6 +16,19 @@ agents:
         "What's the USD to EUR rate?" → {"base": "USD", "target": "EUR", "threshold": null}
         "Is GBP to JPY above 190?" → {"base": "GBP", "target": "JPY", "threshold": 190}
     output_key: parsed_input
+    temperature: 0
+    output_schema:
+      type: object
+      properties:
+        base:
+          type: string
+        target:
+          type: string
+        threshold:
+          type: number
+      required:
+        - base
+        - target
 
   # Step 2: CodeAgent parses JSON string into a dict
   - name: parse_params
@@ -59,6 +71,7 @@ agents:
   - name: reporter
     type: llm
     model: gemini-2.5-flash
+    description: "Generates a human-readable exchange rate report"
     instruction: >
       Generate a concise exchange rate summary.
       Parameters: {params}
@@ -66,6 +79,7 @@ agents:
       Threshold exceeded: {threshold_exceeded}
       Include the currency pair, the rate, and if a threshold was set, whether it was exceeded.
     output_key: analysis
+    temperature: 0.3
 
 orchestration:
   type: sequential

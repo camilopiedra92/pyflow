@@ -5,6 +5,9 @@ agents:
   - name: analyst
     type: llm
     model: gemini-2.5-flash
+    description: "Personal budget analyst with YNAB access — answers finance questions"
+    temperature: 0.2
+    max_output_tokens: 4096
     instruction: >
       You are a personal budget analyst with access to the user's YNAB (You Need A Budget) data.
       Answer questions about their budgets, accounts, categories, transactions, and spending patterns.

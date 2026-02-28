@@ -308,12 +308,24 @@ Error occurs
 ## Quick Reference: Available Tools
 
 ```
-http_request  — HTTP client with SSRF protection
-transform     — JSONPath data extraction
-condition     — Safe boolean expression evaluation
-alert         — Webhook notifications
-storage       — Local file read/write/append
-ynab          — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+Platform tools:
+  http_request           — HTTP client with SSRF protection
+  transform              — JSONPath data extraction
+  condition              — Safe boolean expression evaluation
+  alert                  — Webhook notifications
+  storage                — Local file read/write/append
+  ynab                   — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+
+ADK built-in tools:
+  exit_loop              — Signal loop completion
+  google_search          — Google Search grounding (Gemini auto-invokes)
+  google_maps_grounding  — Google Maps grounding (Gemini auto-invokes)
+  url_context            — Extract content from URLs (Gemini auto-invokes)
+  enterprise_web_search  — Enterprise-compliant web search
+  load_memory            — Load relevant memories for current user
+  preload_memory         — Preload all memories at session start
+  load_artifacts         — Load artifacts into session
+  get_user_choice        — Async user interaction (long-running)
 ```
 
 List custom tools: `pyflow list --tools`
@@ -337,6 +349,8 @@ sequential  — Pipeline: A then B then C    (requires: agents)
 parallel    — Fan-out: A, B, C at once     (requires: agents)
 loop        — Repeat until done            (requires: agents; optional: max_iterations)
 dag         — Dependency graph             (requires: nodes with depends_on)
-react       — Reasoning + acting           (requires: agent; optional: planner)
+react       — Reasoning + acting           (requires: agent; optional: planner, planner_config)
 llm_routed  — LLM delegates to specialists (requires: router, agents)
 ```
+
+Planners for react: `plan_react` (PlanReAct), `builtin` (Gemini BuiltInPlanner with optional `planner_config.thinking_budget`).

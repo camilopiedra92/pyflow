@@ -134,6 +134,48 @@ class TestBuiltinToolCatalog:
         tool = registry.get_function_tool("load_memory")
         assert tool is not None
 
+    def test_resolve_google_maps_grounding(self) -> None:
+        """google_maps_grounding ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("google_maps_grounding")
+        assert tool is not None
+
+    def test_resolve_enterprise_web_search(self) -> None:
+        """enterprise_web_search ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("enterprise_web_search")
+        assert tool is not None
+
+    def test_resolve_url_context(self) -> None:
+        """url_context ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("url_context")
+        assert tool is not None
+
+    def test_resolve_preload_memory(self) -> None:
+        """preload_memory ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("preload_memory")
+        assert tool is not None
+
+    def test_resolve_load_artifacts(self) -> None:
+        """load_artifacts ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("load_artifacts")
+        assert tool is not None
+
+    def test_resolve_get_user_choice(self) -> None:
+        """get_user_choice ADK built-in should be resolvable."""
+        registry = ToolRegistry()
+        registry.discover()
+        tool = registry.get_function_tool("get_user_choice")
+        assert tool is not None
+
     def test_unknown_tool_raises(self) -> None:
         """get_function_tool() should raise KeyError for unknown tool name."""
         registry = ToolRegistry()
