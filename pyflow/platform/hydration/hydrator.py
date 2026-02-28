@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
 from google.adk.agents.llm_agent import LlmAgent
@@ -292,3 +293,24 @@ class WorkflowHydrator:
         if gen_kwargs:
             return types.GenerateContentConfig(**gen_kwargs)
         return None
+
+
+def build_root_agent(caller_file: str) -> BaseAgent:
+    """Build an ADK root_agent from the workflow.yaml next to caller_file.
+
+    Convenience factory for agent packages — replaces identical boilerplate
+    across all packages with a single function call.
+
+    Usage in agent packages::
+
+        from pyflow.platform.hydration.hydrator import build_root_agent
+        root_agent = build_root_agent(__file__)
+    """
+    from pyflow.platform.registry.tool_registry import ToolRegistry
+
+    workflow_path = Path(caller_file).parent / "workflow.yaml"
+    tools = ToolRegistry()
+    tools.discover()
+    workflow = WorkflowDef.from_yaml(workflow_path)
+    hydrator = WorkflowHydrator(tools)
+    return hydrator.hydrate(workflow)
