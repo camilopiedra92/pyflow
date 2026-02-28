@@ -448,6 +448,89 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 
 ---
 
+### `ynab` — YNAB Budget API
+
+Interact with the YNAB (You Need A Budget) API. Manage budgets, accounts, categories, payees, transactions, scheduled transactions, and budget months. Requires `PYFLOW_YNAB_API_TOKEN` environment variable or `ynab_api_token` in platform secrets.
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `action` | `str` | *(required)* | The operation to perform (see actions table below) |
+| `budget_id` | `str` | `""` | YNAB budget ID (required for most actions) |
+| `account_id` | `str` | `""` | YNAB account ID |
+| `category_id` | `str` | `""` | YNAB category ID |
+| `payee_id` | `str` | `""` | YNAB payee ID |
+| `transaction_id` | `str` | `""` | YNAB transaction ID |
+| `scheduled_transaction_id` | `str` | `""` | YNAB scheduled transaction ID |
+| `month` | `str` | `""` | Budget month in YYYY-MM-DD format (first day of month) |
+| `data` | `str` | `"{}"` | JSON string for create/update payloads |
+| `since_date` | `str` | `""` | Filter transactions since this date (YYYY-MM-DD) |
+| `type_filter` | `str` | `""` | Filter transaction type (`uncategorized`, `unapproved`) |
+
+**Actions:**
+
+| Action | HTTP | Description |
+|--------|------|-------------|
+| `list_budgets` | GET | List all budgets |
+| `get_budget` | GET | Get budget details |
+| `list_accounts` | GET | List accounts in a budget |
+| `get_account` | GET | Get account details |
+| `list_categories` | GET | List categories |
+| `get_category` | GET | Get category details |
+| `update_category` | PATCH | Update category (budgeted amount, etc.) |
+| `list_payees` | GET | List payees |
+| `update_payee` | PATCH | Update payee name |
+| `list_transactions` | GET | List transactions (supports `since_date`, `type_filter`) |
+| `get_transaction` | GET | Get transaction details |
+| `create_transaction` | POST | Create transaction(s) |
+| `update_transaction` | PATCH | Update transaction(s) |
+| `list_scheduled_transactions` | GET | List scheduled transactions |
+| `create_scheduled_transaction` | POST | Create scheduled transaction |
+| `update_scheduled_transaction` | PUT | Update scheduled transaction |
+| `delete_scheduled_transaction` | DELETE | Delete scheduled transaction |
+| `list_months` | GET | List budget months |
+| `get_month_category` | GET | Get category details for a specific month |
+
+**Returns:** `{"success": true, "data": {...}}` on success, `{"success": false, "error": "message"}` on failure.
+
+**Setup:**
+```bash
+# Set your YNAB API token (get one at https://app.ynab.com/settings/developer)
+echo 'PYFLOW_YNAB_API_TOKEN=your-token-here' >> .env
+```
+
+**ToolAgent example:**
+```yaml
+- name: list_budgets
+  type: tool
+  tool: ynab
+  tool_config:
+    action: list_budgets
+  output_key: budgets
+
+- name: get_transactions
+  type: tool
+  tool: ynab
+  tool_config:
+    action: list_transactions
+    budget_id: "{budget_id}"
+    since_date: "2024-01-01"
+  output_key: transactions
+```
+
+**LLM agent example:**
+```yaml
+- name: budget_assistant
+  type: llm
+  model: gemini-2.5-flash
+  instruction: "Help the user check their YNAB budget. List their budgets first, then get transactions for the requested budget."
+  tools: [ynab]
+  output_key: budget_info
+```
+
+---
+
 ### Creating Custom Tools
 
 Tools self-register via `__init_subclass__`. To add a new tool:
@@ -487,6 +570,27 @@ class MyTool(BasePlatformTool):
 ```
 
 The tool is immediately available as `my_tool` in any workflow — no registration code needed. ADK's `FunctionTool` inspects the `execute()` signature to generate the tool schema for the LLM.
+
+**Accessing secrets:** Tools that need API tokens use `get_secret(name)` from `pyflow.tools.base`. This checks the `PYFLOW_{NAME}` environment variable first (uppercased), then falls back to the platform secrets dict. Set secrets via environment variables or `.env` file:
+
+```bash
+# .env (gitignored)
+PYFLOW_MY_API_TOKEN=your-token-here
+```
+
+```python
+from pyflow.tools.base import get_secret
+
+class MyApiTool(BasePlatformTool):
+    name = "my_api"
+    description = "Call my API"
+
+    async def execute(self, tool_context: ToolContext, query: str) -> dict:
+        token = get_secret("my_api_token")  # reads PYFLOW_MY_API_TOKEN
+        if not token:
+            return {"success": False, "error": "API token not configured"}
+        # ... use token
+```
 
 ---
 

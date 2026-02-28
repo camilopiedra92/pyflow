@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 361 tests
+- `pytest -v` — run all 404 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -18,6 +18,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Python 3.12 (requires >=3.11), macOS/Linux/Windows
 - Virtual environment at `.venv/` — always activate before running commands
 - `asyncio_mode = "auto"` in pytest config — async tests need no decorator
+- `.env` for local secrets (gitignored) — copy from `.env.example`
 
 ## Code Style
 
@@ -44,11 +45,12 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/condition.py` — ConditionTool (AST-validated safe eval)
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
+- `pyflow/tools/ynab.py` — YnabTool (YNAB budget API: budgets, accounts, categories, payees, transactions)
 - `pyflow/models/workflow.py` — WorkflowDef, AgentConfig, OrchestrationConfig, A2AConfig
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools ref)
 - `pyflow/models/tool.py` — ToolMetadata
-- `pyflow/models/platform.py` — PlatformConfig
+- `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings)
 - `pyflow/cli.py` — Typer CLI (run, validate, list, serve)
 - `pyflow/server.py` — FastAPI server with REST + A2A endpoints
 - `pyflow/config.py` — structlog configuration
@@ -65,10 +67,12 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees
 - Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm
 - A2A agent cards auto-generated from workflow definitions with skills metadata
+- `get_secret(name)` reads `PYFLOW_{NAME}` env var first, falls back to `_PLATFORM_SECRETS` dict. Tools use this for API tokens.
+- PlatformConfig uses `pydantic-settings BaseSettings` — reads env vars with `PYFLOW_` prefix and `.env` files automatically
 
 ## Testing
 
-- 361 tests across 23 test files
+- 404 tests across 33 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
@@ -87,3 +91,4 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `structlog>=24.0` — structured logging
 - `jsonpath-ng>=1.6` — JSONPath transforms
 - `litellm>=1.0` (optional) — multi-provider LLM support (Anthropic, OpenAI)
+- `pydantic-settings>=2.0` — env var and .env config loading (BaseSettings)

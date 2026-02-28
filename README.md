@@ -6,12 +6,12 @@ Agent platform powered by Google ADK. Define multi-agent workflows in YAML, auto
 
 - **Google ADK Runtime** -- Workflows become ADK agent trees (Sequential, Parallel, Loop)
 - **Self-Registering Tools** -- Inherit `BasePlatformTool` to auto-register; no decorators needed
-- **5 Built-in Tools** -- HTTP requests, JSONPath transforms, conditions, alerts, file storage
+- **6 Built-in Tools** -- HTTP requests, JSONPath transforms, conditions, alerts, file storage, YNAB budget API
 - **Multi-Model Support** -- Gemini native, Anthropic/OpenAI via LiteLLM
 - **A2A Protocol** -- Auto-generated agent cards with skills metadata for agent discovery
 - **Fully Typed** -- Pydantic v2 models for all configs, responses, and workflow definitions
 - **Secure** -- AST-validated eval, SSRF protection on HTTP tool
-- **221 Tests** -- Comprehensive suite with mocked ADK components
+- **404 Tests** -- Comprehensive suite with mocked ADK components
 
 ## Quickstart
 
@@ -108,6 +108,7 @@ pip install -e ".[litellm]"
 | Condition | `condition` | Evaluate boolean expressions with safe eval |
 | Alert | `alert` | Send webhook notifications (Slack, Discord, Teams) |
 | Storage | `storage` | Read/write/append JSON to local files |
+| YNAB | `ynab` | Manage YNAB budgets, accounts, categories, payees, and transactions |
 
 ## Architecture
 
@@ -134,11 +135,12 @@ pyflow/
     condition.py      -- Boolean conditions (safe eval)
     alert.py          -- Webhook alerts
     storage.py        -- JSON file storage
+    ynab.py           -- YNAB budget API (19 actions)
   models/
     workflow.py       -- WorkflowDef, OrchestrationConfig, A2AConfig
     agent.py          -- AgentConfig
     tool.py           -- ToolMetadata
-    platform.py       -- PlatformConfig
+    platform.py       -- PlatformConfig (BaseSettings, env vars)
   server.py           -- FastAPI server with REST + A2A endpoints
   cli.py              -- Typer CLI (run, validate, list, serve)
 ```
@@ -146,7 +148,8 @@ pyflow/
 ### Platform Boot Sequence
 
 ```
-boot() -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
+boot() -> set_secrets()          -- inject config.secrets into tool secret store
+       -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
        -> workflows.discover()   -- scan workflows/, parse YAMLs into WorkflowDef
        -> workflows.hydrate()    -- resolve tool refs -> build ADK agent trees
        -> sessions.initialize()  -- create ADK InMemorySessionService
@@ -184,7 +187,7 @@ ruff format .
 
 ## Tech Stack
 
-Python 3.12 | Google ADK | Pydantic v2 | FastAPI | httpx | jsonpath-ng | structlog | typer | LiteLLM
+Python 3.12 | Google ADK | Pydantic v2 | pydantic-settings | FastAPI | httpx | jsonpath-ng | structlog | typer | LiteLLM
 
 ## License
 
