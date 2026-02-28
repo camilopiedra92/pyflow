@@ -44,6 +44,7 @@ class TestGetRegisteredTools:
         assert "condition" in tools
         assert "alert" in tools
         assert "storage" in tools
+        assert "ynab" in tools
 
 
 class TestAsFunctionTool:
