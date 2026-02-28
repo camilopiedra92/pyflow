@@ -59,8 +59,12 @@ class WorkflowRegistry:
         return list(self._workflows.values())
 
     def hydrate(self, tool_registry: ToolRegistry) -> None:
-        """Hydrate all workflows. Placeholder -- Phase 2B fills this."""
-        pass
+        """Hydrate all workflows by converting WorkflowDefs into ADK agent trees."""
+        from pyflow.platform.hydration.hydrator import WorkflowHydrator
+
+        hydrator = WorkflowHydrator(tool_registry)
+        for hw in self._workflows.values():
+            hw.agent = hydrator.hydrate(hw.definition)
 
     def __len__(self) -> int:
         return len(self._workflows)
