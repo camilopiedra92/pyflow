@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from pyflow.models.a2a import AgentCard
 from pyflow.models.workflow import SkillDef, WorkflowDef
 
 
 class AgentCardGenerator:
-    """Generates A2A agent-card.json from workflow definitions."""
+    """Generates A2A agent cards from workflow definitions."""
 
     def __init__(self, base_url: str = "http://localhost:8000"):
         self._base_url = base_url.rstrip("/")
 
     def generate_card(self, workflow: WorkflowDef) -> AgentCard:
-        """Build an AgentCard from a WorkflowDef (utility for testing/tooling)."""
+        """Build an AgentCard from a WorkflowDef."""
         skills: list[SkillDef] = []
         if workflow.a2a and workflow.a2a.skills:
             skills = list(workflow.a2a.skills)
@@ -27,21 +24,6 @@ class AgentCardGenerator:
             skills=skills,
         )
 
-    def generate_all(self, workflows: list[WorkflowDef]) -> list[AgentCard]:
-        """Build AgentCards for all workflows (utility for testing/tooling)."""
-        return [self.generate_card(w) for w in workflows]
-
-    def load_card(self, package_dir: Path) -> AgentCard:
-        """Load an agent card from a package directory's agent-card.json."""
-        card_path = package_dir / "agent-card.json"
-        data = json.loads(card_path.read_text())
-        return AgentCard.model_validate(data)
-
-    def load_all(self, agents_dir: Path) -> list[AgentCard]:
-        """Load agent cards from all agent package subdirectories."""
-        cards = []
-        for package_dir in sorted(agents_dir.iterdir()):
-            card_path = package_dir / "agent-card.json"
-            if package_dir.is_dir() and card_path.exists():
-                cards.append(self.load_card(package_dir))
-        return cards
+    def generate_cards(self, workflows: list[WorkflowDef]) -> list[AgentCard]:
+        """Generate cards for A2A-enabled workflows (those with a2a: section)."""
+        return [self.generate_card(w) for w in workflows if w.a2a is not None]

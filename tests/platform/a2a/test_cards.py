@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from pyflow.models.a2a import AgentCard
 from pyflow.models.workflow import SkillDef
 from pyflow.models.agent import AgentConfig
@@ -94,22 +91,6 @@ class TestCardUrl:
         assert "//" not in card.url.split("://")[1]
 
 
-class TestGenerateAll:
-    def test_generate_all_multiple_workflows(self) -> None:
-        """generate_all returns a card for each workflow."""
-        gen = AgentCardGenerator()
-        workflows = [_minimal_workflow(f"wf_{i}") for i in range(3)]
-        cards = gen.generate_all(workflows)
-
-        assert len(cards) == 3
-        assert [c.name for c in cards] == ["wf_0", "wf_1", "wf_2"]
-
-    def test_generate_all_empty_list(self) -> None:
-        """Empty input yields empty output."""
-        gen = AgentCardGenerator()
-        assert gen.generate_all([]) == []
-
-
 class TestCardStructure:
     def test_card_has_required_a2a_fields(self) -> None:
         """Every generated card contains all required A2A protocol fields."""
@@ -149,83 +130,36 @@ class TestCardStructure:
             assert isinstance(skill.tags, list)
 
 
-class TestLoadCard:
-    def test_load_card_from_json(self, tmp_path: Path) -> None:
-        """load_card() reads agent-card.json from a package directory."""
-        card_data = {
-            "name": "test_agent",
-            "description": "Test agent",
-            "url": "http://localhost:8000/a2a/test_agent",
-            "version": "1.0.0",
-            "skills": [],
-        }
-        (tmp_path / "agent-card.json").write_text(json.dumps(card_data))
+class TestGenerateCards:
+    """generate_cards() filters workflows by a2a presence (opt-in)."""
 
+    def test_only_workflows_with_a2a_generate_cards(self) -> None:
+        """Workflows without a2a: section are excluded."""
         gen = AgentCardGenerator()
-        card = gen.load_card(tmp_path)
+        wf_with_a2a = _minimal_workflow("with_a2a", a2a=A2AConfig(skills=[]))
+        wf_without_a2a = _minimal_workflow("without_a2a")
 
-        assert isinstance(card, AgentCard)
-        assert card.name == "test_agent"
-        assert card.url == "http://localhost:8000/a2a/test_agent"
+        cards = gen.generate_cards([wf_with_a2a, wf_without_a2a])
 
-    def test_load_card_with_skills(self, tmp_path: Path) -> None:
-        """load_card() deserializes skills from JSON."""
-        card_data = {
-            "name": "skilled_agent",
-            "description": "Has skills",
-            "url": "http://localhost:8000/a2a/skilled_agent",
-            "version": "2.0.0",
-            "skills": [
-                {"id": "s1", "name": "Skill One", "description": "First", "tags": ["a"]},
-            ],
-        }
-        (tmp_path / "agent-card.json").write_text(json.dumps(card_data))
-
-        gen = AgentCardGenerator()
-        card = gen.load_card(tmp_path)
-
-        assert card.version == "2.0.0"
-        assert len(card.skills) == 1
-        assert card.skills[0].id == "s1"
-
-
-class TestLoadAll:
-    def test_load_all_from_agent_packages(self, tmp_path: Path) -> None:
-        """load_all() loads cards from all agent package subdirs."""
-        for name in ["agent_a", "agent_b"]:
-            pkg = tmp_path / name
-            pkg.mkdir()
-            card_data = {
-                "name": name,
-                "description": f"Desc {name}",
-                "url": f"http://localhost/{name}",
-                "skills": [],
-            }
-            (pkg / "agent-card.json").write_text(json.dumps(card_data))
-
-        gen = AgentCardGenerator()
-        cards = gen.load_all(tmp_path)
-
-        assert len(cards) == 2
-        assert [c.name for c in cards] == ["agent_a", "agent_b"]
-
-    def test_load_all_skips_dirs_without_card(self, tmp_path: Path) -> None:
-        """load_all() ignores subdirectories without agent-card.json."""
-        pkg = tmp_path / "has_card"
-        pkg.mkdir()
-        (pkg / "agent-card.json").write_text(
-            json.dumps({"name": "has_card", "description": "", "url": "http://x", "skills": []})
-        )
-
-        no_card = tmp_path / "no_card"
-        no_card.mkdir()
-
-        gen = AgentCardGenerator()
-        cards = gen.load_all(tmp_path)
         assert len(cards) == 1
-        assert cards[0].name == "has_card"
+        assert cards[0].name == "with_a2a"
 
-    def test_load_all_empty_dir(self, tmp_path: Path) -> None:
-        """Empty directory returns empty list."""
+    def test_empty_list_returns_empty(self) -> None:
         gen = AgentCardGenerator()
-        assert gen.load_all(tmp_path) == []
+        assert gen.generate_cards([]) == []
+
+    def test_all_without_a2a_returns_empty(self) -> None:
+        gen = AgentCardGenerator()
+        workflows = [_minimal_workflow(f"wf_{i}") for i in range(3)]
+        assert gen.generate_cards(workflows) == []
+
+    def test_all_with_a2a_returns_all(self) -> None:
+        gen = AgentCardGenerator()
+        workflows = [
+            _minimal_workflow(f"wf_{i}", a2a=A2AConfig()) for i in range(3)
+        ]
+        cards = gen.generate_cards(workflows)
+        assert len(cards) == 3
+        assert [c.name for c in cards] == ["wf_0", "wf_1", "wf_2"]
+
+
