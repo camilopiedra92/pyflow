@@ -11,3 +11,4 @@ class RunResult(BaseModel):
     content: str = ""
     author: str = ""
     usage_metadata: Any = None
+    session_id: str | None = None

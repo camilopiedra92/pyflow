@@ -33,7 +33,20 @@ class TestRunResult:
         assert result.usage_metadata is usage
         assert result.usage_metadata.input_tokens == 5
 
+    def test_run_result_with_session_id(self):
+        result = RunResult(content="hello", session_id="sess-123")
+        assert result.session_id == "sess-123"
+
+    def test_run_result_session_id_default(self):
+        result = RunResult()
+        assert result.session_id is None
+
     def test_serialization(self):
         result = RunResult(content="hi", author="bot", usage_metadata={"tokens": 42})
         data = result.model_dump()
-        assert data == {"content": "hi", "author": "bot", "usage_metadata": {"tokens": 42}}
+        assert data == {
+            "content": "hi",
+            "author": "bot",
+            "usage_metadata": {"tokens": 42},
+            "session_id": None,
+        }
