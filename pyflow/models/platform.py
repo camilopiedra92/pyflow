@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class PlatformConfig(BaseModel):
-    """Global platform configuration."""
+class PlatformConfig(BaseSettings):
+    """Global platform configuration.
+
+    Reads from environment variables with PYFLOW_ prefix and .env files.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="PYFLOW_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     tools_dir: str = "pyflow/tools"
     workflows_dir: str = "workflows"

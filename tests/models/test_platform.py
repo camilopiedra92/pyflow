@@ -54,3 +54,25 @@ class TestPlatformConfigSecrets:
     def test_secrets_multiple_keys(self):
         config = PlatformConfig(secrets={"key1": "val1", "key2": "val2"})
         assert len(config.secrets) == 2
+
+
+class TestPlatformConfigEnvVars:
+    def test_env_var_overrides_default_port(self, monkeypatch):
+        monkeypatch.setenv("PYFLOW_PORT", "9999")
+        config = PlatformConfig()
+        assert config.port == 9999
+
+    def test_env_var_overrides_log_level(self, monkeypatch):
+        monkeypatch.setenv("PYFLOW_LOG_LEVEL", "DEBUG")
+        config = PlatformConfig()
+        assert config.log_level == "DEBUG"
+
+    def test_env_var_overrides_host(self, monkeypatch):
+        monkeypatch.setenv("PYFLOW_HOST", "127.0.0.1")
+        config = PlatformConfig()
+        assert config.host == "127.0.0.1"
+
+    def test_explicit_value_beats_env_var(self, monkeypatch):
+        monkeypatch.setenv("PYFLOW_PORT", "9999")
+        config = PlatformConfig(port=3000)
+        assert config.port == 3000
