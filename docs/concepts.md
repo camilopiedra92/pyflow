@@ -1032,7 +1032,7 @@ a2a:                                 # optional, A2A protocol config
 
 ## A2A Protocol
 
-Workflows can expose skills via the Agent-to-Agent (A2A) protocol. Agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot and served at `/.well-known/agent-card.json`.
+Workflows can expose skills via the Agent-to-Agent (A2A) protocol. Agent cards are generated at boot from the `a2a:` section in `workflow.yaml` (opt-in — only workflows with an explicit `a2a:` section get cards) and served at `/.well-known/agent-card.json`.
 
 ```yaml
 a2a:
