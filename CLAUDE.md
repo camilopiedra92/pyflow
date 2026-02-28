@@ -21,6 +21,15 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `asyncio_mode = "auto"` in pytest config — async tests need no decorator
 - `.env` for local secrets (gitignored) — copy from `.env.example`
 
+## Git Strategy (GitHub Flow)
+
+- Main branch: `main` — always stable, all tests pass
+- All work happens in feature branches: `feat/`, `fix/`, `test/`, `docs/`, `chore/`
+- Branch naming matches conventional commits: `feat/add-cache-tool`, `fix/hydrator-edge-case`
+- Every feature branch merges to `main` via PR — no direct pushes to `main`
+- Delete feature branches after merge
+- Never work directly on `main` — always create a branch first
+
 ## Code Style
 
 - ruff for linting/formatting (line-length 100, target py311)
