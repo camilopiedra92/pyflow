@@ -27,3 +27,5 @@ class PlatformConfig(BaseSettings):
     timezone: str = ""
     secrets: dict[str, str] = Field(default_factory=dict)
     cors_origins: list[str] = Field(default_factory=list)
+    telemetry_enabled: bool = False
+    telemetry_export: Literal["console", "otlp", "gcp"] = "console"
