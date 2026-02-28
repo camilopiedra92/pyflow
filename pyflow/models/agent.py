@@ -15,6 +15,7 @@ class AgentConfig(BaseModel):
     tools: list[str] = []
     output_key: str | None = None
     sub_agents: list[str] | None = None
+    callbacks: dict[str, str] | None = None
 
     @model_validator(mode="after")
     def _validate_by_type(self) -> AgentConfig:

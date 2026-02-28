@@ -98,6 +98,24 @@ class TestAgentConfigLoop:
             AgentConfig(name="bad", type="loop")
 
 
+class TestAgentConfigCallbacks:
+    def test_llm_with_callbacks(self):
+        config = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="test",
+            callbacks={"before_agent": "log_start", "after_agent": "log_output"},
+        )
+        assert config.callbacks == {"before_agent": "log_start", "after_agent": "log_output"}
+
+    def test_callbacks_default_none(self):
+        config = AgentConfig(
+            name="test", type="llm", model="gemini-2.5-flash", instruction="test"
+        )
+        assert config.callbacks is None
+
+
 class TestAgentConfigInvalidType:
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):
