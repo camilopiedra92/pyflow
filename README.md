@@ -27,7 +27,7 @@ pyflow run exchange_tracker
 pyflow serve
 
 # Validate a workflow
-pyflow validate pyflow/agents/exchange_tracker/workflow.yaml
+pyflow validate agents/exchange_tracker/workflow.yaml
 
 # List tools and workflows
 pyflow list --tools
@@ -159,7 +159,7 @@ pyflow/
 ```
 boot() -> set_secrets()          -- inject config.secrets into tool secret store
        -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
-       -> workflows.discover()   -- scan pyflow/agents/, discover packages
+       -> workflows.discover()   -- scan agents/, discover packages
        -> workflows.hydrate()    -- resolve tool refs -> build ADK agent trees
        -> ready
 

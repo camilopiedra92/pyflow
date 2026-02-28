@@ -34,7 +34,7 @@ Before diagnosing, reproduce the exact failure:
 source .venv/bin/activate
 
 # Validation only (stages 1-2):
-pyflow validate pyflow/agents/<name>/workflow.yaml
+pyflow validate agents/<name>/workflow.yaml
 
 # Full execution (stages 1-4):
 pyflow run <name> -i '{"message": "test input"}'
@@ -300,7 +300,7 @@ Error occurs
 │   └── Template not resolved → Check {variable} matches state key
 │
 └── Not sure which stage?
-    └── Run: pyflow validate pyflow/agents/<name>/workflow.yaml
+    └── Run: pyflow validate agents/<name>/workflow.yaml
         ├── Passes → Problem is in hydration or runtime (stage 3-4)
         └── Fails → Problem is in parse or validation (stage 1-2)
 ```

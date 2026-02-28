@@ -78,7 +78,7 @@ def run(
     input_json: str = typer.Option("{}", "--input", "-i", help="JSON input for the workflow"),
     user_id: str = typer.Option("default", "--user-id", "-u", help="User ID for session"),
     workflows_dir: str = typer.Option(
-        "pyflow/agents", "--workflows-dir", "-w", help="Workflows directory"
+        "agents", "--workflows-dir", "-w", help="Workflows directory"
     ),
 ) -> None:
     """Run a workflow by name."""
@@ -129,7 +129,7 @@ def validate(
 def list_cmd(
     tools: bool = typer.Option(False, "--tools", "-t", help="List platform tools"),
     workflows: bool = typer.Option(False, "--workflows", "-w", help="List workflows"),
-    workflows_dir: str = typer.Option("pyflow/agents", "--workflows-dir", help="Workflows directory"),
+    workflows_dir: str = typer.Option("agents", "--workflows-dir", help="Workflows directory"),
 ) -> None:
     """List registered tools or discovered workflows."""
     config = PlatformConfig(workflows_dir=workflows_dir)
@@ -157,7 +157,7 @@ def serve(
     host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
     port: int = typer.Option(8000, "--port", "-p", help="Server port"),
     workflows_dir: str = typer.Option(
-        "pyflow/agents", "--workflows-dir", "-w", help="Workflows directory"
+        "agents", "--workflows-dir", "-w", help="Workflows directory"
     ),
 ) -> None:
     """Start the FastAPI server."""
@@ -169,7 +169,7 @@ def serve(
 @app.command()
 def init(
     name: str = typer.Argument(help="Name for the new agent package"),
-    agents_dir: str = typer.Option("pyflow/agents", "--agents-dir", help="Agents directory"),
+    agents_dir: str = typer.Option("agents", "--agents-dir", help="Agents directory"),
 ) -> None:
     """Scaffold a new agent package."""
     pkg_dir = Path(agents_dir) / name

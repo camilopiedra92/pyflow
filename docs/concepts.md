@@ -263,7 +263,7 @@ LLM agents always write text to state, even if the text is JSON. When you need t
 # Code agent parses JSON string into a dict
 - name: parse_params
   type: code
-  function: pyflow.agents.exchange_tracker.helpers.parse_currency_request
+  function: agents.exchange_tracker.helpers.parse_currency_request
   input_keys: [parsed_input]
   output_key: params
 

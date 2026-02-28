@@ -15,7 +15,7 @@ from pyflow.platform.executor import WorkflowExecutor
 class TestPlatformIntegration:
     async def test_boot_discovers_tools(self):
         """Platform boot discovers all built-in tools."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
         tools = platform.list_tools()
@@ -29,7 +29,7 @@ class TestPlatformIntegration:
 
     async def test_boot_discovers_workflows(self):
         """Platform boot discovers YAML workflows."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
         workflows = platform.list_workflows()
@@ -40,7 +40,7 @@ class TestPlatformIntegration:
 
     async def test_workflow_hydration_creates_agents(self):
         """Hydrated workflow has an ADK agent tree."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
         hw = platform.workflows.get("exchange_tracker")
@@ -50,7 +50,7 @@ class TestPlatformIntegration:
 
     async def test_agent_cards_generated(self):
         """A2A agent cards loaded from agent package directories."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
         cards = platform.agent_cards()
@@ -62,7 +62,7 @@ class TestPlatformIntegration:
 
     async def test_platform_uses_workflow_executor(self):
         """Platform uses WorkflowExecutor, not legacy PlatformRunner."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         assert isinstance(platform.executor, WorkflowExecutor)
         assert not hasattr(platform, "runner"), "PlatformRunner should not exist"
@@ -81,7 +81,7 @@ class TestPlatformIntegration:
 class TestWorkflowValidation:
     async def test_validate_exchange_tracker_workflow(self):
         """exchange_tracker.yaml is valid and uses mixed agent types."""
-        path = Path("pyflow/agents/exchange_tracker/workflow.yaml")
+        path = Path("agents/exchange_tracker/workflow.yaml")
         assert path.exists()
         data = yaml.safe_load(path.read_text())
         workflow = WorkflowDef(**data)
@@ -99,7 +99,7 @@ class TestWorkflowValidation:
 
     async def test_validate_example_workflow(self):
         """example.yaml is valid and parses correctly."""
-        path = Path("pyflow/agents/example/workflow.yaml")
+        path = Path("agents/example/workflow.yaml")
         assert path.exists()
         data = yaml.safe_load(path.read_text())
         workflow = WorkflowDef(**data)
@@ -111,21 +111,21 @@ class TestWorkflowValidation:
 class TestRuntimeConfig:
     async def test_exchange_tracker_has_runtime_config(self):
         """exchange_tracker.yaml includes runtime configuration."""
-        path = Path("pyflow/agents/exchange_tracker/workflow.yaml")
+        path = Path("agents/exchange_tracker/workflow.yaml")
         data = yaml.safe_load(path.read_text())
         workflow = WorkflowDef(**data)
         assert workflow.runtime.session_service == "in_memory"
 
     async def test_example_has_runtime_config(self):
         """example.yaml includes runtime configuration."""
-        path = Path("pyflow/agents/example/workflow.yaml")
+        path = Path("agents/example/workflow.yaml")
         data = yaml.safe_load(path.read_text())
         workflow = WorkflowDef(**data)
         assert workflow.runtime.session_service == "in_memory"
 
     async def test_runtime_config_hydrates_correctly(self):
         """Workflows with runtime config hydrate through the platform."""
-        config = PlatformConfig(workflows_dir="pyflow/agents")
+        config = PlatformConfig(workflows_dir="agents")
         platform = PyFlowPlatform(config)
         await platform.boot()
 

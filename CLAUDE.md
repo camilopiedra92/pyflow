@@ -11,7 +11,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
 - `pyflow list --workflows` — list discovered workflows
-- `pyflow init <name>` — scaffold a new agent package under `pyflow/agents/`
+- `pyflow init <name>` — scaffold a new agent package under `agents/`
 - `pyflow serve` — start FastAPI server on port 8000
 
 ## Environment
@@ -63,7 +63,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/cli.py` — Typer CLI (run, validate, list, init, serve)
 - `pyflow/server.py` — FastAPI server with REST + A2A endpoints
 - `pyflow/config.py` — structlog configuration
-- `pyflow/agents/` — ADK-compatible agent packages (each with `__init__.py`, `agent.py`, `agent-card.json`, `workflow.yaml`)
+- `agents/` — ADK-compatible agent packages (each with `__init__.py`, `agent.py`, `agent-card.json`, `workflow.yaml`)
 - `tests/` — mirrors source structure, pytest + pytest-asyncio
 
 ## Key Patterns
@@ -87,9 +87,9 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 ## Agent Packages
 
-- `pyflow/agents/example/` — simple sequential workflow (condition + transform tools)
-- `pyflow/agents/exchange_tracker/` — 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
-- `pyflow/agents/budget_analyst/` — ReAct agent with PlanReAct planner using YNAB tool for budget Q&A
+- `agents/example/` — simple sequential workflow (condition + transform tools)
+- `agents/exchange_tracker/` — 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
+- `agents/budget_analyst/` — ReAct agent with PlanReAct planner using YNAB tool for budget Q&A
 
 Each package contains: `__init__.py`, `agent.py` (exports `root_agent`), `agent-card.json` (A2A metadata), `workflow.yaml` (definition). Use `pyflow init <name>` to scaffold new packages.
 

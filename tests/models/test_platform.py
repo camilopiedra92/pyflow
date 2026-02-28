@@ -10,7 +10,7 @@ class TestPlatformConfig:
     def test_defaults(self):
         config = PlatformConfig()
         assert config.tools_dir == "pyflow/tools"
-        assert config.workflows_dir == "pyflow/agents"
+        assert config.workflows_dir == "agents"
         assert config.log_level == "INFO"
         assert config.host == "0.0.0.0"
         assert config.port == 8000
