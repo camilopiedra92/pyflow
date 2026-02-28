@@ -41,7 +41,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 ## Architecture
 
-- `pyflow/platform/app.py` — PyFlowPlatform orchestrator (boot, shutdown, run_workflow lifecycle)
+- `pyflow/platform/app.py` — PyFlowPlatform orchestrator (boot with .env loading, shutdown, run_workflow lifecycle)
 - `pyflow/platform/registry/tool_registry.py` — ToolRegistry: auto-discover + register tools
 - `pyflow/platform/registry/workflow_registry.py` — WorkflowRegistry: discover + hydrate YAML workflows
 - `pyflow/platform/registry/discovery.py` — Filesystem scanner for tools and agent packages
@@ -92,6 +92,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction automatically — all agents are datetime-aware
 - Executor injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session state
 - `PYFLOW_TIMEZONE` env var configures timezone (defaults to system timezone detection via `/etc/localtime`)
+- Platform auto-loads `.env` during `boot()` (ADK-aligned: walks from `workflows_dir` to root, preserves explicit env vars, respects `ADK_DISABLE_LOAD_DOTENV`). Disable via `PYFLOW_LOAD_DOTENV=false`
 
 ## Agent Packages
 

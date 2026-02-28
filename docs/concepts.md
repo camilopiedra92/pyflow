@@ -874,20 +874,20 @@ pip install "google-adk[extensions]"
 
 LiteLLM is lazy-imported — workflows using only Gemini models don't need it installed.
 
-**2. Set API keys as environment variables:**
+**2. Set API keys in `.env`:**
 
 ```bash
-# For Gemini (always required)
-export GOOGLE_API_KEY="your-google-api-key"
+# .env (gitignored) — auto-loaded by PyFlowPlatform.boot()
+GOOGLE_API_KEY=your-google-api-key
 
-# For Anthropic (only if using anthropic/ models)
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
+# Only if using anthropic/ models:
+ANTHROPIC_API_KEY=your-anthropic-api-key
 
-# For OpenAI (only if using openai/ models)
-export OPENAI_API_KEY="your-openai-api-key"
+# Only if using openai/ models:
+OPENAI_API_KEY=your-openai-api-key
 ```
 
-Each provider requires its own API key. You only need to set keys for the providers you actually use.
+PyFlow auto-loads `.env` during `platform.boot()` following the ADK pattern (walks from `workflows_dir` to root). All variables in `.env` are exported to `os.environ`, making them available to third-party SDKs. Disable with `PYFLOW_LOAD_DOTENV=false` or `ADK_DISABLE_LOAD_DOTENV=1`.
 
 ### Supported Models
 

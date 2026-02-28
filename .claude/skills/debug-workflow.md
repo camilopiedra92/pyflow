@@ -182,6 +182,16 @@ The sandbox blocks: imports, `getattr`/`setattr`/`delattr`, `globals`/`locals`/`
 
 Fix: Simplify the expression to use only safe builtins (`abs`, `all`, `any`, `bool`, `float`, `int`, `len`, `max`, `min`, `round`, `sorted`, `str`, `sum`, `tuple`, `list`). If you need more, use a `code` agent instead.
 
+### API key not found / "No API key was provided"
+
+**"No API key was provided"** or **"ValueError: No API key"** — The Google Gemini SDK can't find `GOOGLE_API_KEY` in `os.environ`.
+
+Check:
+1. Is `GOOGLE_API_KEY` set in `.env`? PyFlow auto-loads `.env` during `platform.boot()` (walks from `workflows_dir` to root)
+2. Is `.env` in the right location? Must be in or above the `agents/` directory
+3. Is `PYFLOW_LOAD_DOTENV=false` set? This disables auto-loading
+4. Check boot logs for `dotenv.loaded path=...` — if missing, `.env` wasn't found
+
 ### LiteLLM import error
 
 **"No module named 'google.adk.models.lite_llm'"** — Using an `anthropic/` or `openai/` model but `litellm` isn't installed.
