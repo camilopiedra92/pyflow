@@ -33,15 +33,16 @@ No registration code needed. Run `pyflow init <name>` to scaffold a new agent pa
 
 ## Implementation Checklist
 
-1. Design agents and data flow
-2. Choose orchestration type
-3. Scaffold the agent package and edit its files:
+1. Ensure `.env` has required API keys (`GOOGLE_API_KEY`, etc.) — auto-loaded by `platform.boot()`
+2. Design agents and data flow
+3. Choose orchestration type
+4. Scaffold the agent package and edit its files:
    - `pyflow init <name>` to scaffold the package
    - Edit `agents/<name>/workflow.yaml`
    - Edit `agents/<name>/agent-card.json` if A2A skills needed
-4. Validate: `source .venv/bin/activate && pyflow validate agents/<name>/workflow.yaml`
-5. If using custom code/tools, ensure they exist
-6. Test: `pyflow run <name> -i '{"message": "test input"}'`
+5. Validate: `source .venv/bin/activate && pyflow validate agents/<name>/workflow.yaml`
+6. If using custom code/tools, ensure they exist
+7. Test: `pyflow run <name> -i '{"message": "test input"}'`
 
 ## YAML Structure
 
