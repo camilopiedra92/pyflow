@@ -139,7 +139,7 @@ async def test_run_workflow_delegates_to_executor() -> None:
 
     p.workflows.get.assert_called_once_with("my_wf")
     p.executor.build_runner.assert_called_once_with(fake_agent, fake_hw.definition.runtime)
-    p.executor.run.assert_awaited_once_with(fake_runner, message="hello")
+    p.executor.run.assert_awaited_once_with(fake_runner, user_id="default", message="hello")
     assert isinstance(result, RunResult)
     assert result.content == "done"
 
