@@ -21,7 +21,7 @@ agents:
   # Step 2: CodeAgent parses JSON string into a dict
   - name: parse_params
     type: code
-    function: workflows.helpers.parse_currency_request
+    function: pyflow.agents.exchange_tracker.helpers.parse_currency_request
     input_keys: [parsed_input]
     output_key: params
 
