@@ -84,3 +84,19 @@ class TestSecretStore:
         set_secrets({"a": "1"})
         clear_secrets()
         assert get_secret("a") is None
+
+    def test_get_secret_from_env_var(self, monkeypatch):
+        monkeypatch.setenv("PYFLOW_MY_SECRET", "from-env")
+        assert get_secret("my_secret") == "from-env"
+
+    def test_env_var_takes_priority_over_dict(self, monkeypatch):
+        set_secrets({"my_secret": "from-dict"})
+        monkeypatch.setenv("PYFLOW_MY_SECRET", "from-env")
+        assert get_secret("my_secret") == "from-env"
+
+    def test_dict_fallback_when_no_env_var(self):
+        set_secrets({"my_secret": "from-dict"})
+        assert get_secret("my_secret") == "from-dict"
+
+    def test_none_when_neither_env_nor_dict(self):
+        assert get_secret("nonexistent") is None

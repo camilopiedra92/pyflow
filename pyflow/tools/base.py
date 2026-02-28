@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
@@ -19,7 +20,14 @@ def set_secrets(secrets: dict[str, str]) -> None:
 
 
 def get_secret(name: str) -> str | None:
-    """Retrieve a secret by name. Returns None if not found."""
+    """Retrieve a secret by name.
+
+    Checks environment variable PYFLOW_{NAME} first (uppercase),
+    then falls back to the platform secrets dict.
+    """
+    env_val = os.environ.get(f"PYFLOW_{name.upper()}")
+    if env_val is not None:
+        return env_val
     return _PLATFORM_SECRETS.get(name)
 
 
