@@ -11,6 +11,7 @@ from google.adk.agents.parallel_agent import ParallelAgent
 from google.adk.agents.sequential_agent import SequentialAgent
 from google.adk.planners import BuiltInPlanner, PlanReActPlanner
 from google.adk.tools.agent_tool import AgentTool
+from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 from google.genai import types
 
 from pyflow.models.agent import AgentConfig
@@ -99,8 +100,9 @@ class WorkflowHydrator:
     parallel, or loop), callbacks, and planners.
     """
 
-    def __init__(self, tool_registry: ToolRegistry) -> None:
+    def __init__(self, tool_registry: ToolRegistry, base_dir: Path | None = None) -> None:
         self._tool_registry = tool_registry
+        self._base_dir = base_dir or Path(".")
 
     def hydrate(self, workflow: WorkflowDef) -> BaseAgent:
         """Convert WorkflowDef into an ADK agent tree. Returns root ADK BaseAgent."""
@@ -149,6 +151,23 @@ class WorkflowHydrator:
         """Build an LlmAgent with resolved tools, model, and optional callbacks."""
         model: Union[str, BaseLlm] = self._resolve_model(config.model)
         tools = self._tool_registry.resolve_tools(config.tools) if config.tools else []
+
+        # Resolve OpenAPI toolsets
+        for openapi_cfg in config.openapi_tools:
+            spec_path = self._base_dir / openapi_cfg.spec
+            spec_str = spec_path.read_text()
+            spec_type = "json" if spec_path.suffix == ".json" else "yaml"
+            auth_scheme, auth_credential = _resolve_openapi_auth(openapi_cfg.auth)
+            kwargs_openapi: dict = {
+                "spec_str": spec_str,
+                "spec_str_type": spec_type,
+            }
+            if auth_scheme is not None:
+                kwargs_openapi["auth_scheme"] = auth_scheme
+            if auth_credential is not None:
+                kwargs_openapi["auth_credential"] = auth_credential
+            tools.append(OpenAPIToolset(**kwargs_openapi))
+
         callbacks = self._resolve_callbacks(config.callbacks)
 
         instruction = config.instruction or ""
@@ -379,9 +398,10 @@ def build_root_agent(caller_file: str) -> BaseAgent:
     """
     from pyflow.platform.registry.tool_registry import ToolRegistry
 
-    workflow_path = Path(caller_file).parent / "workflow.yaml"
+    workflow_dir = Path(caller_file).parent
+    workflow_path = workflow_dir / "workflow.yaml"
     tools = ToolRegistry()
     tools.discover()
     workflow = WorkflowDef.from_yaml(workflow_path)
-    hydrator = WorkflowHydrator(tools)
+    hydrator = WorkflowHydrator(tools, base_dir=workflow_dir)
     return hydrator.hydrate(workflow)
