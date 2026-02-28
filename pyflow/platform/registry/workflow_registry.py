@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+from pydantic import BaseModel, ConfigDict
 
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.registry.discovery import scan_directory
@@ -13,12 +13,13 @@ if TYPE_CHECKING:
     from pyflow.platform.registry.tool_registry import ToolRegistry
 
 
-@dataclass
-class HydratedWorkflow:
+class HydratedWorkflow(BaseModel):
     """A workflow definition paired with its hydrated ADK agent (when available)."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     definition: WorkflowDef
-    agent: Any | None = None  # Filled by hydrator in Phase 2B
+    agent: Any = None  # Filled by hydrator in Phase 2B
 
 
 class WorkflowRegistry:
