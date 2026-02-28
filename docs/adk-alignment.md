@@ -24,7 +24,7 @@ PyFlow's `WorkflowDef` YAML is fundamentally different from ADK's `AgentConfig`:
 - Agent-as-tool composition (`agent_tools` field)
 - A2A protocol configuration (opt-in per workflow)
 - MCP server connections (`mcp_servers` in runtime config)
-- OpenAPI tool generation (`openapi_tools` in runtime config)
+- OpenAPI tool generation (`openapi_tools` on agent config)
 
 ### Self-Registering Tools
 Platform tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__`.
@@ -45,7 +45,7 @@ ADK tools are also available by name (`exit_loop`, `google_search`, `transfer_to
 | `AgentTool` | Agent-as-tool composition via `agent_tools` YAML field |
 | Plugins (7 registered) | `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics` |
 | `McpToolset` | MCP server connections configurable via `mcp_servers` in workflow YAML |
-| `OpenAPIToolset` | OpenAPI spec → auto-generated tools via `openapi_tools` in workflow YAML |
+| `OpenAPIToolset` | OpenAPI spec → auto-generated tools via `openapi_tools` on agent config (per-agent, created at hydration time) |
 | Planners | `PlanReActPlanner`, `BuiltInPlanner` for react orchestration |
 | Callbacks (FQN) | `before_agent`, `before_model`, etc. resolved via Python FQN |
 | OpenTelemetry | Opt-in distributed tracing via `telemetry_enabled`/`telemetry_export` in PlatformConfig |

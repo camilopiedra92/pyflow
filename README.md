@@ -4,7 +4,7 @@
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Tests: 547 passing](https://img.shields.io/badge/tests-547%20passing-brightgreen)
+![Tests: 539 passing](https://img.shields.io/badge/tests-539%20passing-brightgreen)
 ![Google ADK](https://img.shields.io/badge/powered%20by-Google%20ADK-4285F4)
 
 PyFlow is an agent platform that turns YAML workflow definitions into [Google ADK](https://google.github.io/adk-docs/) agent trees. Tools self-register at boot, agents compose into pipelines (sequential, parallel, loop, DAG), and the [A2A protocol](https://google.github.io/A2A/) makes every workflow discoverable by other agents.
@@ -36,12 +36,12 @@ PyFlow is an agent platform that turns YAML workflow definitions into [Google AD
 - **A2A agent cards** — auto-generated from the `a2a:` section in workflow YAML; opt-in per workflow
 - **REST + A2A server** — FastAPI server exposes both REST endpoints and A2A protocol
 - **MCP tools** — connect to Model Context Protocol servers via `mcp_servers` in runtime config
-- **OpenAPI tools** — auto-generate tools from OpenAPI specs via `openapi_tools` in runtime config
+- **OpenAPI tools** — auto-generate tools from OpenAPI specs via `openapi_tools` on agent config (ADK `OpenAPIToolset`)
 
 ### Developer Experience
 
 - **CLI** — `pyflow run`, `validate`, `list`, `init`, `serve`
-- **547 tests** across 40 test files — fully mocked, no real network or LLM calls
+- **539 tests** across 45 test files — fully mocked, no real network or LLM calls
 - **Fully typed** — Pydantic v2 models for all configs, responses, and workflow definitions
 - **Structured logging** — structlog with ISO timestamps
 - **OpenTelemetry** — opt-in tracing and metrics via platform telemetry config
@@ -271,7 +271,6 @@ pip install -e ".[litellm]"
 | `condition` | Evaluate boolean expressions with AST-validated safe eval |
 | `alert` | Send webhook notifications to Slack, Discord, or Teams |
 | `storage` | Read, write, and append JSON to local files |
-| `ynab` | YNAB budget API — budgets, accounts, categories, payees, transactions (19 actions) |
 
 Custom tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__`. To create a new tool:
 
@@ -330,10 +329,9 @@ pyflow/
     condition.py              # ConditionTool (AST-validated safe eval)
     alert.py                  # AlertTool (webhook notifications)
     storage.py                # StorageTool (JSON file read/write/append)
-    ynab.py                   # YnabTool (YNAB budget API, 19 actions)
   models/
-    workflow.py               # WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig, OpenApiToolConfig
-    agent.py                  # AgentConfig (model, instruction, tools, schemas, generation config)
+    workflow.py               # WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig
+    agent.py                  # AgentConfig (model, instruction, tools, schemas, generation config, openapi_tools), OpenApiAuthConfig, OpenApiToolConfig
     tool.py                   # ToolMetadata
     platform.py               # PlatformConfig (pydantic-settings BaseSettings, telemetry config)
   server.py                   # FastAPI server with REST + A2A endpoints
@@ -341,9 +339,9 @@ pyflow/
   config.py                   # structlog configuration
 agents/
   exchange_tracker/           # 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
-  budget_analyst/             # ReAct agent with BuiltInPlanner and YNAB tool
+  budget_analyst/             # ReAct agent with BuiltInPlanner and YNAB OpenAPI tools
   example/                    # Simple sequential workflow (condition + transform)
-tests/                        # 547 tests across 40 files, mirrors source structure
+tests/                        # 539 tests across 45 files, mirrors source structure
 ```
 
 ### Platform Boot Sequence
@@ -437,7 +435,7 @@ ruff format .
 
 ### Testing
 
-- **547 tests** across 40 test files
+- **539 tests** across 45 test files
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
 - Server tests use `httpx.ASGITransport` for in-process FastAPI testing

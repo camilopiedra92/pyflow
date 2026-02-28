@@ -492,86 +492,34 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 
 ---
 
-### `ynab` — YNAB Budget API
+### OpenAPI Tools
 
-Interact with the YNAB (You Need A Budget) API. Manage budgets, accounts, categories, payees, transactions, scheduled transactions, and budget months. Requires `PYFLOW_YNAB_API_TOKEN` environment variable or `ynab_api_token` in platform secrets.
+LLM agents can declare OpenAPI specs via `openapi_tools` to auto-generate tools from any OpenAPI/Swagger specification. The hydrator creates an ADK `OpenAPIToolset` at hydration time and injects the generated tools into the agent.
 
-**Parameters:**
+**Agent-level config:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `action` | `str` | *(required)* | The operation to perform (see actions table below) |
-| `budget_id` | `str` | `""` | YNAB budget ID (required for most actions) |
-| `account_id` | `str` | `""` | YNAB account ID |
-| `category_id` | `str` | `""` | YNAB category ID |
-| `payee_id` | `str` | `""` | YNAB payee ID |
-| `transaction_id` | `str` | `""` | YNAB transaction ID |
-| `scheduled_transaction_id` | `str` | `""` | YNAB scheduled transaction ID |
-| `month` | `str` | `""` | Budget month in YYYY-MM-DD format (first day of month) |
-| `data` | `str` | `"{}"` | JSON string for create/update payloads |
-| `since_date` | `str` | `""` | Filter transactions since this date (YYYY-MM-DD) |
-| `type_filter` | `str` | `""` | Filter transaction type (`uncategorized`, `unapproved`) |
-
-**Actions:**
-
-| Action | HTTP | Description |
-|--------|------|-------------|
-| `list_budgets` | GET | List all budgets |
-| `get_budget` | GET | Get budget details |
-| `list_accounts` | GET | List accounts in a budget |
-| `get_account` | GET | Get account details |
-| `list_categories` | GET | List categories |
-| `get_category` | GET | Get category details |
-| `update_category` | PATCH | Update category (budgeted amount, etc.) |
-| `list_payees` | GET | List payees |
-| `update_payee` | PATCH | Update payee name |
-| `list_transactions` | GET | List transactions (supports `since_date`, `type_filter`) |
-| `get_transaction` | GET | Get transaction details |
-| `create_transaction` | POST | Create transaction(s) |
-| `update_transaction` | PATCH | Update transaction(s) |
-| `list_scheduled_transactions` | GET | List scheduled transactions |
-| `create_scheduled_transaction` | POST | Create scheduled transaction |
-| `update_scheduled_transaction` | PUT | Update scheduled transaction |
-| `delete_scheduled_transaction` | DELETE | Delete scheduled transaction |
-| `list_months` | GET | List budget months |
-| `get_month_category` | GET | Get category details for a specific month |
-
-**Returns:** `{"success": true, "data": {...}}` on success, `{"success": false, "error": "message"}` on failure.
-
-**Setup:**
-```bash
-# Set your YNAB API token (get one at https://app.ynab.com/settings/developer)
-echo 'PYFLOW_YNAB_API_TOKEN=your-token-here' >> .env
-```
-
-**ToolAgent example:**
-```yaml
-- name: list_budgets
-  type: tool
-  tool: ynab
-  tool_config:
-    action: list_budgets
-  output_key: budgets
-
-- name: get_transactions
-  type: tool
-  tool: ynab
-  tool_config:
-    action: list_transactions
-    budget_id: "{budget_id}"
-    since_date: "2024-01-01"
-  output_key: transactions
-```
-
-**LLM agent example:**
 ```yaml
 - name: budget_assistant
   type: llm
   model: gemini-2.5-flash
-  instruction: "Help the user check their YNAB budget. List their budgets first, then get transactions for the requested budget."
-  tools: [ynab]
+  instruction: "Help the user manage their budget"
+  openapi_tools:
+    - spec: specs/ynab-v1-openapi.yaml
+      auth:
+        type: bearer
+        token_env: PYFLOW_YNAB_API_TOKEN
   output_key: budget_info
 ```
+
+**Auth types:**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `bearer` | `token_env` | Bearer token from env var |
+| `api_key` | `token_env`, `header_name` | API key in a custom header (defaults to `X-API-Key`) |
+| *(none)* | — | No authentication |
+
+Each operation in the OpenAPI spec becomes a callable tool injected into the agent. The spec path is resolved relative to the workflow YAML file.
 
 ---
 
@@ -747,8 +695,6 @@ runtime:
   session_db_path: null
   # MCP server connections
   mcp_servers: []
-  # OpenAPI tool generation
-  openapi_tools: []
 ```
 
 ### Session Service
@@ -821,7 +767,7 @@ from pyflow.tools.base import get_secret
 token = get_secret("ynab_api_token")  # reads PYFLOW_YNAB_API_TOKEN
 ```
 
-This is what all current platform tools use (`ynab`, `http_request` with auth headers, `alert`). No runtime config needed.
+This is what all current platform tools use (`http_request` with auth headers, `alert`). No runtime config needed.
 
 #### `credential_service` — OAuth and dynamic credentials (advanced)
 
@@ -924,19 +870,6 @@ runtime:
 ```
 
 MCP server tools become available by name in any agent's `tools:` list. Supports SSE and stdio transports.
-
-### OpenAPI Tools
-
-Auto-generate tools from OpenAPI specifications:
-
-```yaml
-runtime:
-  openapi_tools:
-    - spec: "specs/petstore.yaml"
-      name_prefix: "petstore"
-```
-
-Each operation in the spec becomes a callable tool, available by name (with optional prefix) in any agent's `tools:` list.
 
 ---
 
@@ -1132,6 +1065,11 @@ agents:                              # required, list of agent configs
     top_p: 0.95                      # optional
     top_k: 40                        # optional
     agent_tools: [other_agent]       # optional, wraps agents as callable tools
+    openapi_tools:                   # optional, OpenAPI specs -> auto-generated tools
+      - spec: "specs/api.yaml"
+        auth:
+          type: bearer
+          token_env: PYFLOW_API_TOKEN
     callbacks:
       before_agent: mypackage.callbacks.fn  # Python FQN
       after_agent: mypackage.callbacks.fn
