@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import AsyncClient, ASGITransport
 
+from pyflow.models.a2a import AgentCard
+from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
 from pyflow.models.workflow import WorkflowDef
 
@@ -107,7 +109,8 @@ class TestWorkflows:
         assert data["workflows"][0]["name"] == "test-wf"
 
     async def test_run_workflow_success(self, client: AsyncClient):
-        client._mock_platform.run_workflow.return_value = {"output": "done"}
+        run_result = RunResult(content="done", author="test-agent")
+        client._mock_platform.run_workflow.return_value = run_result
 
         response = await client.post(
             "/api/workflows/test/run",
@@ -115,7 +118,9 @@ class TestWorkflows:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["result"] == {"output": "done"}
+        assert "result" in data
+        assert data["result"]["content"] == "done"
+        assert data["result"]["author"] == "test-agent"
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test", {"message": "hello", "data": {}}
         )
@@ -147,7 +152,7 @@ class TestWorkflows:
 class TestA2A:
     async def test_agent_cards_endpoint(self, client: AsyncClient):
         client._mock_platform.agent_cards.return_value = [
-            {"name": "test-wf", "url": "http://localhost:8000/a2a/test-wf"}
+            AgentCard(name="test-wf", url="http://localhost:8000/a2a/test-wf")
         ]
 
         response = await client.get("/.well-known/agent-card.json")
@@ -157,7 +162,8 @@ class TestA2A:
         assert data[0]["name"] == "test-wf"
 
     async def test_a2a_execute_success(self, client: AsyncClient):
-        client._mock_platform.run_workflow.return_value = {"output": "a2a result"}
+        run_result = RunResult(content="a2a result", author="a2a-agent")
+        client._mock_platform.run_workflow.return_value = run_result
 
         response = await client.post(
             "/a2a/test-wf",
@@ -165,7 +171,9 @@ class TestA2A:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["result"] == {"output": "a2a result"}
+        assert "result" in data
+        assert data["result"]["content"] == "a2a result"
+        assert data["result"]["author"] == "a2a-agent"
 
     async def test_a2a_execute_not_found(self, client: AsyncClient):
         client._mock_platform.run_workflow.side_effect = KeyError("test-wf")
