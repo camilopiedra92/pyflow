@@ -398,3 +398,183 @@ class TestYnabToolTransactions:
 
         assert result["success"] is True
         assert result["data"]["transaction"]["id"] == "t-1"
+
+
+class TestYnabToolScheduledTransactions:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_list_scheduled_transactions(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"scheduled_transactions": [{"id": "st-1"}]}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="list_scheduled_transactions",
+                budget_id="b-1",
+            )
+
+        assert result["success"] is True
+
+    async def test_create_scheduled_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"scheduled_transaction": {"id": "st-new"}}}
+        mock_resp = _mock_ynab_response(201, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        st_data = json.dumps({"scheduled_transaction": {"amount": -10000, "frequency": "monthly"}})
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="create_scheduled_transaction",
+                budget_id="b-1",
+                data=st_data,
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "POST"
+
+    async def test_update_scheduled_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"scheduled_transaction": {"id": "st-1"}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        import json
+        update_data = json.dumps({"scheduled_transaction": {"amount": -20000}})
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="update_scheduled_transaction",
+                budget_id="b-1",
+                scheduled_transaction_id="st-1",
+                data=update_data,
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "PUT"
+
+    async def test_delete_scheduled_transaction(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"scheduled_transaction": {"id": "st-1", "deleted": True}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="delete_scheduled_transaction",
+                budget_id="b-1",
+                scheduled_transaction_id="st-1",
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert call_kwargs["method"] == "DELETE"
+
+
+class TestYnabToolMonths:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_list_months(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"months": [{"month": "2024-06-01"}]}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_months", budget_id="b-1"
+            )
+
+        assert result["success"] is True
+
+    async def test_get_month_category(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"data": {"category": {"id": "cat-1", "budgeted": 100000}}}
+        mock_resp = _mock_ynab_response(200, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                action="get_month_category",
+                budget_id="b-1",
+                month="2024-06-01",
+                category_id="cat-1",
+            )
+
+        assert result["success"] is True
+        call_kwargs = client.request.call_args[1]
+        assert "/months/2024-06-01/categories/cat-1" in call_kwargs["url"]
+
+
+class TestYnabToolErrorHandling:
+    def setup_method(self):
+        clear_secrets()
+        set_secrets({"ynab_api_token": "test-token"})
+
+    def teardown_method(self):
+        clear_secrets()
+
+    async def test_api_401_error(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        body = {"error": {"id": "401", "name": "unauthorized", "detail": "Invalid token"}}
+        mock_resp = _mock_ynab_response(401, body)
+        client = _mock_client(mock_resp)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_budgets"
+            )
+
+        assert result["success"] is False
+        assert "401" in result["error"]
+
+    async def test_network_error(self):
+        from pyflow.tools.ynab import YnabTool
+
+        tool = YnabTool()
+        client = AsyncMock()
+        client.request = AsyncMock(side_effect=httpx.HTTPError("connection refused"))
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("pyflow.tools.ynab.httpx.AsyncClient", return_value=client):
+            result = await tool.execute(
+                tool_context=MagicMock(), action="list_budgets"
+            )
+
+        assert result["success"] is False
+        assert "connection refused" in result["error"]
