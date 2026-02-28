@@ -7,7 +7,7 @@
 ![Tests: 482 passing](https://img.shields.io/badge/tests-482%20passing-brightgreen)
 ![Google ADK](https://img.shields.io/badge/powered%20by-Google%20ADK-4285F4)
 
-PyFlow is an agent platform that turns YAML workflow definitions into [Google ADK](https://google.github.io/adk-docs/) agent trees. Tools self-register at boot, agents compose into pipelines (sequential, parallel, loop), and the [A2A protocol](https://google.github.io/A2A/) makes every workflow discoverable by other agents.
+PyFlow is an agent platform that turns YAML workflow definitions into [Google ADK](https://google.github.io/adk-docs/) agent trees. Tools self-register at boot, agents compose into pipelines (sequential, parallel, loop, DAG), and the [A2A protocol](https://google.github.io/A2A/) makes every workflow discoverable by other agents.
 
 ---
 
@@ -202,8 +202,27 @@ The top-level `orchestration` block controls how root-level agents are composed:
 | `sequential` | Agents run in order, each seeing the accumulated state |
 | `parallel` | Agents run concurrently |
 | `loop` | Agents repeat until exit condition |
+| `dag` | Dependency graph — agents run in waves based on `depends_on` declarations |
 | `llm_routed` | An LLM routes to sub-agents based on their `description` fields |
 | `planner: builtin` | Gemini BuiltInPlanner dynamically orchestrates agents |
+
+#### DAG Orchestration
+
+Define explicit dependencies between agents. Nodes with satisfied dependencies run in parallel (wave-based scheduling via `asyncio.gather`). Cycles are detected at parse time using Kahn's algorithm.
+
+```yaml
+orchestration:
+  type: dag
+  nodes:
+    - agent: fetch
+      depends_on: []
+    - agent: parse
+      depends_on: [fetch]
+    - agent: enrich
+      depends_on: [fetch]
+    - agent: store
+      depends_on: [parse, enrich]   # waits for both before running
+```
 
 ---
 
@@ -296,6 +315,7 @@ pyflow/
       hydrator.py             # YAML -> Pydantic -> ADK agent tree + build_root_agent() factory
       schema.py               # JSON Schema -> dynamic Pydantic models (output_schema/input_schema)
     agents/
+      dag_agent.py            # DagAgent: wave-based parallel DAG execution with deadlock detection
       expr_agent.py           # ExprAgent: inline Python expressions (AST-validated sandbox)
     a2a/
       cards.py                # AgentCardGenerator: generate A2A cards from workflow definitions
