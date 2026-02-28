@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
-
 from pyflow.models.agent import OpenApiAuthConfig
 from pyflow.platform.hydration.hydrator import _resolve_openapi_auth
 

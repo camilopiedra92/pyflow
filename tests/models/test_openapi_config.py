@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from pyflow.models.agent import AgentConfig, OpenApiAuthConfig, OpenApiToolConfig
 
 
