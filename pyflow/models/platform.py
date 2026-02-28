@@ -13,3 +13,4 @@ class PlatformConfig(BaseModel):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
+    secrets: dict[str, str] = Field(default_factory=dict)

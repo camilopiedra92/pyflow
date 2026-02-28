@@ -40,3 +40,17 @@ class TestPlatformConfig:
     def test_invalid_log_level(self):
         with pytest.raises(ValidationError):
             PlatformConfig(log_level="TRACE")
+
+
+class TestPlatformConfigSecrets:
+    def test_secrets_default_empty(self):
+        config = PlatformConfig()
+        assert config.secrets == {}
+
+    def test_secrets_accepts_dict(self):
+        config = PlatformConfig(secrets={"ynab_api_token": "abc123"})
+        assert config.secrets["ynab_api_token"] == "abc123"
+
+    def test_secrets_multiple_keys(self):
+        config = PlatformConfig(secrets={"key1": "val1", "key2": "val2"})
+        assert len(config.secrets) == 2
