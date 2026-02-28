@@ -39,7 +39,7 @@ No registration code needed. Run `pyflow init <name>` to scaffold a new agent pa
 4. Scaffold the agent package and edit its files:
    - `pyflow init <name>` to scaffold the package
    - Edit `agents/<name>/workflow.yaml`
-   - Edit `agents/<name>/agent-card.json` if A2A skills needed
+   - Add `a2a:` section to `workflow.yaml` if A2A discovery is needed (cards are generated at boot)
 5. Validate: `source .venv/bin/activate && pyflow validate agents/<name>/workflow.yaml`
 6. If using custom code/tools, ensure they exist
 7. Test: `pyflow run <name> -i '{"message": "test input"}'`
@@ -403,7 +403,7 @@ a2a:
       tags: [finance, monitoring]
 ```
 
-Agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot. Edit `agents/<name>/agent-card.json` to configure A2A metadata. Cards are served at `/a2a/agent-card.json`.
+Agent cards are generated at boot from the `a2a:` section in `workflow.yaml` (opt-in — only workflows with explicit `a2a:` get cards). Cards are served at `/.well-known/agent-card.json`. No static JSON files needed.
 
 ## Validation
 
