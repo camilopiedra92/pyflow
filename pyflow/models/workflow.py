@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, model_validator
@@ -52,6 +52,7 @@ class OrchestrationConfig(BaseModel):
     agent: str | None = None  # for react (single agent)
     router: str | None = None  # for llm_routed
     planner: str | None = None  # for react
+    planner_config: dict[str, Any] | None = None  # for react/builtin planner
     max_iterations: int | None = None  # for loop
 
     @model_validator(mode="after")

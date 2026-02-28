@@ -50,7 +50,6 @@ class ToolAgent(BaseAgent):
             )
             return
 
-        ctx.session.state[self.output_key] = result
         result_text = json.dumps(result) if not isinstance(result, str) else result
         yield Event(
             author=self.name,

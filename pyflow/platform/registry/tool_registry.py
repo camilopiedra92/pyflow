@@ -8,10 +8,21 @@ from google.adk.tools.exit_loop_tool import exit_loop
 from pyflow.models.tool import ToolMetadata
 from pyflow.tools.base import BasePlatformTool
 
-# ADK built-in tools available by name in workflow YAML
-_ADK_BUILTIN_TOOLS: dict[str, Callable[[], FunctionTool]] = {
+# ADK built-in tools available by name in workflow YAML.
+# google_search and load_memory are tool instances (not FunctionTool), returned directly.
+_ADK_BUILTIN_TOOLS: dict[str, Callable] = {
     "exit_loop": lambda: FunctionTool(func=exit_loop),
+    "google_search": lambda: _lazy_import_builtin("google.adk.tools", "google_search"),
+    "load_memory": lambda: _lazy_import_builtin("google.adk.tools", "load_memory"),
 }
+
+
+def _lazy_import_builtin(module_path: str, attr: str):
+    """Lazy-import an ADK built-in tool. Returns None if not available."""
+    import importlib
+
+    mod = importlib.import_module(module_path)
+    return getattr(mod, attr)
 
 
 class ToolRegistry:

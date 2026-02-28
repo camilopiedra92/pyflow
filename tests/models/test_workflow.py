@@ -399,6 +399,20 @@ class TestOrchestrationConfigExpanded:
         with pytest.raises(ValidationError):
             OrchestrationConfig(type="llm_routed", agents=["a"])
 
+    def test_react_with_planner_config(self):
+        config = OrchestrationConfig(
+            type="react",
+            agent="reasoner",
+            planner="builtin",
+            planner_config={"thinking_budget": 1024},
+        )
+        assert config.planner == "builtin"
+        assert config.planner_config == {"thinking_budget": 1024}
+
+    def test_planner_config_defaults_to_none(self):
+        config = OrchestrationConfig(type="react", agent="reasoner")
+        assert config.planner_config is None
+
     def test_loop_with_max_iterations(self):
         config = OrchestrationConfig(type="loop", agents=["a", "b"], max_iterations=5)
         assert config.max_iterations == 5

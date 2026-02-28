@@ -14,7 +14,7 @@ class AgentCardGenerator:
         self._base_url = base_url.rstrip("/")
 
     def generate_card(self, workflow: WorkflowDef) -> AgentCard:
-        """Generate an A2A agent card for a single workflow."""
+        """Build an AgentCard from a WorkflowDef (utility for testing/tooling)."""
         skills: list[SkillDef] = []
         if workflow.a2a and workflow.a2a.skills:
             skills = list(workflow.a2a.skills)
@@ -28,7 +28,7 @@ class AgentCardGenerator:
         )
 
     def generate_all(self, workflows: list[WorkflowDef]) -> list[AgentCard]:
-        """Generate agent cards for all workflows."""
+        """Build AgentCards for all workflows (utility for testing/tooling)."""
         return [self.generate_card(w) for w in workflows]
 
     def load_card(self, package_dir: Path) -> AgentCard:

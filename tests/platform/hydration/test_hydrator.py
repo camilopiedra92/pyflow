@@ -276,6 +276,49 @@ class TestHydrateReactOrchestration:
         assert isinstance(root, LlmAgent)
         assert root.name == "reasoner"
 
+    def test_react_builtin_planner(self, mock_tool_registry):
+        """Orchestration with planner=builtin -> agent has BuiltInPlanner."""
+        agents = [
+            _make_llm_agent_config(name="thinker", instruction="Think deeply"),
+        ]
+        orch = OrchestrationConfig(
+            type="react",
+            agent="thinker",
+            planner="builtin",
+            planner_config={"thinking_budget": 2048},
+        )
+        workflow = _make_workflow(agents=agents, orchestration=orch)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+
+        with patch("pyflow.platform.hydration.hydrator.BuiltInPlanner") as MockPlanner:
+            mock_planner_instance = MagicMock()
+            MockPlanner.return_value = mock_planner_instance
+
+            root = hydrator.hydrate(workflow)
+
+            from google.adk.agents.llm_agent import LlmAgent
+
+            assert isinstance(root, LlmAgent)
+            MockPlanner.assert_called_once()
+            assert root.planner is mock_planner_instance
+
+    def test_react_builtin_planner_no_config(self, mock_tool_registry):
+        """Orchestration with planner=builtin but no planner_config -> BuiltInPlanner()."""
+        agents = [
+            _make_llm_agent_config(name="thinker", instruction="Think"),
+        ]
+        orch = OrchestrationConfig(type="react", agent="thinker", planner="builtin")
+        workflow = _make_workflow(agents=agents, orchestration=orch)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+
+        with patch("pyflow.platform.hydration.hydrator.BuiltInPlanner") as MockPlanner:
+            mock_planner_instance = MagicMock()
+            MockPlanner.return_value = mock_planner_instance
+
+            root = hydrator.hydrate(workflow)
+            MockPlanner.assert_called_once_with()
+            assert root.planner is mock_planner_instance
+
 
 class TestHydrateDagOrchestration:
     def test_dag_creates_dag_agent(self, mock_tool_registry):
@@ -739,6 +782,218 @@ class TestHydrateExprAgent:
         assert len(root.sub_agents) == 2
         assert isinstance(root.sub_agents[0], ExprAgent)
         assert root.sub_agents[1].name == "reporter"
+
+    def test_description_passed_to_llm_agent(self, mock_tool_registry):
+        """AgentConfig with description -> LlmAgent gets description kwarg."""
+        agents = [
+            AgentConfig(
+                name="desc_agent",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Do stuff",
+                description="Handles data fetching from APIs",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.description == "Handles data fetching from APIs"
+
+    def test_description_empty_not_passed(self, mock_tool_registry):
+        """AgentConfig with empty description -> LlmAgent uses its default."""
+        agents = [_make_llm_agent_config(name="no_desc")]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        # Default LlmAgent description is empty string
+        assert llm_agent.name == "no_desc"
+
+    def test_include_contents_none_passed(self, mock_tool_registry):
+        """AgentConfig with include_contents='none' -> LlmAgent gets include_contents."""
+        agents = [
+            AgentConfig(
+                name="isolated",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Process independently",
+                include_contents="none",
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.include_contents == "none"
+
+    def test_include_contents_default_not_passed(self, mock_tool_registry):
+        """AgentConfig with include_contents='default' -> not passed to LlmAgent."""
+        agents = [_make_llm_agent_config(name="normal")]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        # LlmAgent default is "default"
+        assert llm_agent.name == "normal"
+
+    def test_output_schema_creates_pydantic_model(self, mock_tool_registry):
+        """AgentConfig with output_schema -> LlmAgent gets Pydantic output_schema."""
+        from pydantic import BaseModel
+
+        agents = [
+            AgentConfig(
+                name="structured",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Return structured data",
+                output_schema={
+                    "type": "object",
+                    "properties": {"result": {"type": "string"}, "score": {"type": "number"}},
+                    "required": ["result", "score"],
+                },
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.output_schema is not None
+        assert issubclass(llm_agent.output_schema, BaseModel)
+
+    def test_input_schema_creates_pydantic_model(self, mock_tool_registry):
+        """AgentConfig with input_schema -> LlmAgent gets Pydantic input_schema."""
+        from pydantic import BaseModel
+
+        agents = [
+            AgentConfig(
+                name="typed_input",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Process typed input",
+                input_schema={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.input_schema is not None
+        assert issubclass(llm_agent.input_schema, BaseModel)
+
+    def test_generate_content_config_with_temperature(self, mock_tool_registry):
+        """AgentConfig with temperature -> LlmAgent gets GenerateContentConfig."""
+        agents = [
+            AgentConfig(
+                name="warm_agent",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Be creative",
+                temperature=0.9,
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.generate_content_config is not None
+        assert llm_agent.generate_content_config.temperature == 0.9
+
+    def test_generate_content_config_all_params(self, mock_tool_registry):
+        """AgentConfig with all gen params -> GenerateContentConfig has all fields."""
+        agents = [
+            AgentConfig(
+                name="full_config",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Controlled output",
+                temperature=0.5,
+                max_output_tokens=2048,
+                top_p=0.95,
+                top_k=40,
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        gen = llm_agent.generate_content_config
+        assert gen is not None
+        assert gen.temperature == 0.5
+        assert gen.max_output_tokens == 2048
+        assert gen.top_p == 0.95
+        assert gen.top_k == 40
+
+    def test_no_gen_params_no_config(self, mock_tool_registry):
+        """AgentConfig with no gen params -> no GenerateContentConfig set."""
+        agents = [_make_llm_agent_config(name="default_gen")]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.generate_content_config is None
+
+    def test_no_schema_defaults(self, mock_tool_registry):
+        """AgentConfig without schemas -> LlmAgent schemas are None."""
+        agents = [_make_llm_agent_config(name="no_schema")]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        assert llm_agent.output_schema is None
+        assert llm_agent.input_schema is None
+
+    def test_agent_tools_wraps_agents_as_agent_tool(self, mock_tool_registry):
+        """AgentConfig with agent_tools -> referenced agents wrapped as AgentTool."""
+        from google.adk.tools.agent_tool import AgentTool
+
+        agents = [
+            _make_llm_agent_config(name="summarizer", instruction="Summarize text"),
+            AgentConfig(
+                name="researcher",
+                type="llm",
+                model="gemini-2.5-flash",
+                instruction="Research topics",
+                agent_tools=["summarizer"],
+            ),
+        ]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        # Find the researcher agent in the orchestration
+        researcher = next(a for a in root.sub_agents if a.name == "researcher")
+        agent_tool_instances = [t for t in researcher.tools if isinstance(t, AgentTool)]
+        assert len(agent_tool_instances) == 1
+        assert agent_tool_instances[0].agent.name == "summarizer"
+
+    def test_no_agent_tools_unchanged(self, mock_tool_registry):
+        """AgentConfig without agent_tools -> tools list unchanged."""
+        agents = [_make_llm_agent_config(name="plain", tools=["http_request"])]
+        workflow = _make_workflow(agents=agents)
+        hydrator = WorkflowHydrator(mock_tool_registry)
+        root = hydrator.hydrate(workflow)
+
+        llm_agent = root.sub_agents[0]
+        # Only the mock tool from registry, no AgentTool
+        from google.adk.tools.agent_tool import AgentTool
+
+        agent_tool_instances = [t for t in llm_agent.tools if isinstance(t, AgentTool)]
+        assert len(agent_tool_instances) == 0
 
     def test_unsafe_expression_fails_at_hydration(self, mock_tool_registry):
         """Expr agent with unsafe expression -> ValueError at hydration time."""
