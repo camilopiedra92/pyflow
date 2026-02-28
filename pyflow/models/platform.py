@@ -19,6 +19,7 @@ class PlatformConfig(BaseSettings):
         extra="ignore",
     )
 
+    load_dotenv: bool = True
     tools_dir: str = "pyflow/tools"
     workflows_dir: str = "agents"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
