@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from pyflow.models.runner import UsageSummary
 from pyflow.platform.metrics_plugin import MetricsPlugin
@@ -146,3 +146,56 @@ class TestMetricsPluginSummary:
     def test_plugin_name(self):
         plugin = MetricsPlugin()
         assert plugin.name == "pyflow_metrics"
+
+
+class TestMetricsPluginLogging:
+    async def test_after_model_logs_step(self):
+        plugin = MetricsPlugin()
+        callback_ctx = MagicMock()
+        llm_response = MagicMock()
+        llm_response.usage_metadata.prompt_token_count = 100
+        llm_response.usage_metadata.candidates_token_count = 50
+        llm_response.usage_metadata.cached_content_token_count = 0
+        llm_response.usage_metadata.total_token_count = 150
+        llm_response.model_version = "gemini-2.5-flash"
+
+        with patch("pyflow.platform.metrics_plugin.logger") as mock_logger:
+            await plugin.after_model_callback(
+                callback_context=callback_ctx, llm_response=llm_response
+            )
+            mock_logger.info.assert_called_once()
+            call_kwargs = mock_logger.info.call_args
+            assert call_kwargs[0][0] == "workflow.llm_call"
+            assert call_kwargs[1]["tokens_in"] == 100
+            assert call_kwargs[1]["tokens_out"] == 50
+
+    async def test_before_tool_logs_call(self):
+        plugin = MetricsPlugin()
+        tool = MagicMock()
+        tool.name = "ynab"
+        tool_ctx = MagicMock()
+
+        with patch("pyflow.platform.metrics_plugin.logger") as mock_logger:
+            await plugin.before_tool_callback(
+                tool=tool, tool_args={"action": "list"}, tool_context=tool_ctx
+            )
+            mock_logger.info.assert_called_once()
+            call_kwargs = mock_logger.info.call_args
+            assert call_kwargs[0][0] == "workflow.tool_call"
+            assert call_kwargs[1]["tool"] == "ynab"
+
+    async def test_after_run_logs_summary(self):
+        plugin = MetricsPlugin()
+        plugin._start_time = 1000.0
+        plugin._input_tokens = 500
+        plugin._output_tokens = 100
+        ctx = MagicMock()
+
+        with patch("pyflow.platform.metrics_plugin.logger") as mock_logger:
+            with patch("time.monotonic", return_value=1003.0):
+                await plugin.after_run_callback(invocation_context=ctx)
+            mock_logger.info.assert_called_once()
+            call_kwargs = mock_logger.info.call_args
+            assert call_kwargs[0][0] == "workflow.complete"
+            assert call_kwargs[1]["duration_ms"] == 3000
+            assert call_kwargs[1]["tokens_in"] == 500

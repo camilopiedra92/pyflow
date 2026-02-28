@@ -3,6 +3,10 @@ from __future__ import annotations
 import time
 from typing import Any, Optional, TYPE_CHECKING
 
+import structlog
+
+logger = structlog.get_logger()
+
 from google.adk.plugins.base_plugin import BasePlugin
 
 from pyflow.models.runner import UsageSummary
@@ -50,6 +54,13 @@ class MetricsPlugin(BasePlugin):
         model_ver = getattr(llm_response, "model_version", None)
         if model_ver:
             self._model = model_ver
+        logger.info(
+            "workflow.llm_call",
+            tokens_in=getattr(usage, "prompt_token_count", 0) or 0 if usage else 0,
+            tokens_out=getattr(usage, "candidates_token_count", 0) or 0 if usage else 0,
+            model=model_ver or self._model,
+            llm_call=self._llm_calls,
+        )
         return None
 
     async def before_tool_callback(
@@ -60,6 +71,11 @@ class MetricsPlugin(BasePlugin):
         tool_context: ToolContext,
     ) -> Optional[dict]:
         self._tool_calls += 1
+        logger.info(
+            "workflow.tool_call",
+            tool=tool.name,
+            tool_call=self._tool_calls,
+        )
         return None
 
     async def on_event_callback(
@@ -72,6 +88,18 @@ class MetricsPlugin(BasePlugin):
         self, *, invocation_context: InvocationContext
     ) -> None:
         self._end_time = time.monotonic()
+        duration = int((self._end_time - self._start_time) * 1000) if self._start_time else 0
+        logger.info(
+            "workflow.complete",
+            duration_ms=duration,
+            tokens_in=self._input_tokens,
+            tokens_out=self._output_tokens,
+            total_tokens=self._total_tokens,
+            steps=self._steps,
+            llm_calls=self._llm_calls,
+            tool_calls=self._tool_calls,
+            model=self._model,
+        )
 
     def summary(self) -> UsageSummary:
         duration = 0
