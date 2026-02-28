@@ -1,74 +1,108 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import typer
+import structlog
 
-from pyflow.config import configure_logging
-from pyflow.core.engine import WorkflowEngine
-from pyflow.core.loader import load_all_workflows, load_workflow
-from pyflow.nodes import default_registry
+from pyflow.platform.app import PyFlowPlatform
+from pyflow.models.platform import PlatformConfig
 
-app = typer.Typer(name="pyflow", help="PyFlow — Workflow Automation Engine")
+app = typer.Typer(name="pyflow", help="PyFlow ADK Platform")
+logger = structlog.get_logger()
 
 
 @app.command()
-def run(workflow_path: Path) -> None:
-    """Execute a workflow from a YAML file."""
-    configure_logging()
-    wf = load_workflow(workflow_path)
-    typer.echo(f"Running workflow: {wf.name}")
-    engine = WorkflowEngine(registry=default_registry)
+def run(
+    workflow_name: str = typer.Argument(help="Name of workflow to execute"),
+    input_json: str = typer.Option("{}", "--input", "-i", help="JSON input for the workflow"),
+    workflows_dir: str = typer.Option(
+        "workflows", "--workflows-dir", "-w", help="Workflows directory"
+    ),
+) -> None:
+    """Run a workflow by name."""
     try:
-        ctx = asyncio.run(engine.run(wf))
-    except Exception as exc:
-        typer.echo(f"Workflow failed: {exc}", err=True)
+        input_data = json.loads(input_json)
+    except json.JSONDecodeError as e:
+        typer.echo(f"Invalid JSON input: {e}", err=True)
         raise typer.Exit(code=1)
-    typer.echo(f"Completed. Run ID: {ctx.run_id}")
-    for node_id in [n.id for n in wf.nodes]:
-        if ctx.has_result(node_id):
-            typer.echo(f"  {node_id}: OK")
-        elif ctx.has_error(node_id):
-            typer.echo(f"  {node_id}: ERROR — {ctx.get_error(node_id)}")
-        else:
-            typer.echo(f"  {node_id}: SKIPPED")
+
+    config = PlatformConfig(workflows_dir=workflows_dir)
+    platform = PyFlowPlatform(config)
+
+    async def _run():
+        await platform.boot()
+        try:
+            result = await platform.run_workflow(workflow_name, input_data)
+            typer.echo(json.dumps(result, indent=2))
+        finally:
+            await platform.shutdown()
+
+    asyncio.run(_run())
 
 
 @app.command()
-def validate(workflow_path: Path) -> None:
-    """Validate a workflow YAML file."""
+def validate(
+    yaml_path: str = typer.Argument(help="Path to workflow YAML file"),
+) -> None:
+    """Validate a workflow YAML file without executing."""
+    import yaml as pyyaml
+    from pyflow.models.workflow import WorkflowDef
+
+    path = Path(yaml_path)
+    if not path.exists():
+        typer.echo(f"File not found: {yaml_path}", err=True)
+        raise typer.Exit(code=1)
+
     try:
-        wf = load_workflow(workflow_path)
-        typer.echo(f"Valid: {wf.name} ({len(wf.nodes)} nodes)")
-    except Exception as exc:
-        typer.echo(f"Invalid: {exc}", err=True)
+        data = pyyaml.safe_load(path.read_text())
+        workflow = WorkflowDef(**data)
+        typer.echo(f"Valid workflow: {workflow.name}")
+    except Exception as e:
+        typer.echo(f"Validation error: {e}", err=True)
         raise typer.Exit(code=1)
 
 
 @app.command(name="list")
-def list_workflows(directory: Path = typer.Argument(default=Path("workflows"))) -> None:
-    """List all workflows in a directory."""
-    workflows = load_all_workflows(directory)
-    if not workflows:
-        typer.echo("No workflows found.")
-        return
-    for wf in workflows:
-        trigger = wf.trigger.type
-        typer.echo(f"  {wf.name} [{trigger}] ({len(wf.nodes)} nodes)")
+def list_cmd(
+    tools: bool = typer.Option(False, "--tools", "-t", help="List platform tools"),
+    workflows: bool = typer.Option(False, "--workflows", "-w", help="List workflows"),
+    workflows_dir: str = typer.Option(
+        "workflows", "--workflows-dir", help="Workflows directory"
+    ),
+) -> None:
+    """List registered tools or discovered workflows."""
+    config = PlatformConfig(workflows_dir=workflows_dir)
+    platform = PyFlowPlatform(config)
+
+    async def _list():
+        await platform.boot()
+        try:
+            if tools:
+                for t in platform.list_tools():
+                    typer.echo(f"  {t.name}: {t.description}")
+            elif workflows:
+                for w in platform.list_workflows():
+                    typer.echo(f"  {w.name}: {w.description}")
+            else:
+                typer.echo("Use --tools or --workflows")
+        finally:
+            await platform.shutdown()
+
+    asyncio.run(_list())
 
 
 @app.command()
 def serve(
-    workflows_dir: Path = typer.Argument(default=Path("workflows")),
-    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
-    port: int = typer.Option(8000, help="Port to bind to"),
+    host: str = typer.Option("0.0.0.0", "--host", help="Server host"),
+    port: int = typer.Option(8000, "--port", "-p", help="Server port"),
+    workflows_dir: str = typer.Option(
+        "workflows", "--workflows-dir", "-w", help="Workflows directory"
+    ),
 ) -> None:
-    """Start PyFlow server with webhook listeners and schedulers."""
-    configure_logging()
+    """Start the FastAPI server."""
     import uvicorn
-    from pyflow.server import create_app
 
-    fastapi_app = create_app(workflows_dir)
-    typer.echo(f"Starting PyFlow server on {host}:{port}")
-    uvicorn.run(fastapi_app, host=host, port=port)
+    uvicorn.run("pyflow.server:app", host=host, port=port, reload=False)
