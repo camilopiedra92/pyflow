@@ -14,6 +14,8 @@ description: >
 
 This skill guides the creation of a new agent type — a new kind of building block that can be used in any workflow YAML. This is the pattern used to build ExprAgent, CodeAgent, ToolAgent, and DagAgent.
 
+> **Note:** The runtime DAG node class is `DagNodeRuntime` (in `dag_agent.py`), distinct from `DagNode` (the Pydantic config model in `workflow.py`).
+
 Adding a new agent type touches exactly 7 files, always in the same pattern. This skill encodes that pattern to avoid missed steps.
 
 ## Before You Start
@@ -126,8 +128,7 @@ class NewTypeAgent(BaseAgent):
             )
             return
 
-        # Success path: write to session state AND emit state_delta
-        ctx.session.state[self.output_key] = result
+        # Success path: emit state_delta (ADK applies it via session_service.append_event)
         result_text = json.dumps(result) if not isinstance(result, str) else result
         yield Event(
             author=self.name,
@@ -148,12 +149,11 @@ class NewTypeAgent(BaseAgent):
 - `content` — with a `types.Content(parts=[types.Part(text=...)], role="model")`
 - `actions` — with `EventActions(state_delta={...})`
 
-**State propagation (critical)**: Always write to `ctx.session.state` directly AND include in `state_delta`. ADK's SequentialAgent does not apply `state_delta` from events between sub-agents — subsequent agents in a sequence won't see the state unless it's written directly to the session.
+**State propagation**: Use `state_delta` only — ADK applies it automatically via `session_service.append_event()`. Do NOT write to `ctx.session.state` directly (redundant and can cause race conditions in parallel execution).
 
 ```python
-# BOTH are needed:
-ctx.session.state[self.output_key] = result          # immediate visibility for next agent
-actions=EventActions(state_delta={self.output_key: result})  # for ADK Runner event processing
+# Only state_delta is needed — ADK handles the rest:
+actions=EventActions(state_delta={self.output_key: result})
 ```
 
 **State delta**: On success, `state_delta={self.output_key: result}`. On error, `state_delta={}` (empty — don't pollute state with error data).

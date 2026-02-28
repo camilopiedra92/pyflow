@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 430 tests
+- `pytest -v` — run all 476 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -46,6 +46,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/platform/registry/workflow_registry.py` — WorkflowRegistry: discover + hydrate YAML workflows
 - `pyflow/platform/registry/discovery.py` — Filesystem scanner for tools and agent packages
 - `pyflow/platform/hydration/hydrator.py` — WorkflowHydrator: YAML -> Pydantic -> ADK Agent tree
+- `pyflow/platform/hydration/schema.py` — json_schema_to_pydantic: JSON Schema -> dynamic Pydantic models
 - `pyflow/platform/executor.py` — WorkflowExecutor: builds ADK Runner, injects datetime state into sessions
 - `pyflow/platform/a2a/cards.py` — AgentCardGenerator: load static agent-card.json from agent packages
 - `pyflow/tools/base.py` — BasePlatformTool ABC + auto-registration via `__init_subclass__`
@@ -55,9 +56,9 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
 - `pyflow/tools/ynab.py` — YnabTool (YNAB budget API: budgets, accounts, categories, payees, transactions)
-- `pyflow/models/workflow.py` — WorkflowDef, AgentConfig, OrchestrationConfig, A2AConfig
+- `pyflow/models/workflow.py` — WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
-- `pyflow/models/agent.py` — AgentConfig (model, instruction, tools ref)
+- `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools)
 - `pyflow/models/tool.py` — ToolMetadata
 - `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone)
 - `pyflow/cli.py` — Typer CLI (run, validate, list, init, serve)
@@ -71,10 +72,17 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__` — no manual registration needed
 - Each tool defines `name`, `description` class vars + async `execute()` with typed parameters
 - `as_function_tool()` converts any platform tool to an ADK `FunctionTool`
-- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`), `orchestration`, and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
+- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`, plus optional `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`), `orchestration`, and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
 - `expr` agents evaluate safe Python expressions inline (AST-validated, restricted builtins, no imports/IO) — reuses sandbox from ConditionTool
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees
-- Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm
+- Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm (lazy-loaded via `@lru_cache`)
+- `output_schema`/`input_schema` in YAML are JSON Schema dicts, converted to Pydantic models at hydration time via `json_schema_to_pydantic()`
+- `temperature`, `max_output_tokens`, `top_p`, `top_k` build a `GenerateContentConfig` passed to LlmAgent
+- `description` on LLM agents is used by `llm_routed` orchestration for agent routing
+- `include_contents: "none"` hides conversation history from an agent (isolated sub-tasks)
+- `agent_tools` wraps referenced agents as ADK `AgentTool` for agent-as-tool composition
+- Built-in tool catalog: `exit_loop`, `google_search`, `load_memory` (lazy-imported from ADK)
+- OrchestrationConfig supports `planner: builtin` with `planner_config: {thinking_budget: N}` for Gemini BuiltInPlanner
 - A2A agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot
 - Each agent package exports `root_agent` via `__init__.py` for ADK compatibility (`adk web`, `adk deploy`)
 - `WorkflowDef.from_yaml(path)` loads and validates YAML into Pydantic models
@@ -87,15 +95,15 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 ## Agent Packages
 
-- `agents/example/` — simple sequential workflow (condition + transform tools)
-- `agents/exchange_tracker/` — 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
-- `agents/budget_analyst/` — ReAct agent with PlanReAct planner using YNAB tool for budget Q&A
+- `agents/example/` — simple sequential workflow (condition + transform tools, description + temperature)
+- `agents/exchange_tracker/` — 7-step pipeline: LLM (output_schema) → code → expr → tool → expr → expr → LLM (temperature)
+- `agents/budget_analyst/` — ReAct agent with PlanReAct planner, YNAB tool (description, temperature, max_output_tokens)
 
 Each package contains: `__init__.py`, `agent.py` (exports `root_agent`), `agent-card.json` (A2A metadata), `workflow.yaml` (definition). Use `pyflow init <name>` to scaffold new packages.
 
 ## Testing
 
-- 430 tests across 33 test files
+- 476 tests across 35 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`

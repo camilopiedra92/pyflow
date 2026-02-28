@@ -308,12 +308,15 @@ Error occurs
 ## Quick Reference: Available Tools
 
 ```
-http_request  — HTTP client with SSRF protection
-transform     — JSONPath data extraction
-condition     — Safe boolean expression evaluation
-alert         — Webhook notifications
-storage       — Local file read/write/append
-ynab          — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+http_request    — HTTP client with SSRF protection
+transform       — JSONPath data extraction
+condition       — Safe boolean expression evaluation
+alert           — Webhook notifications
+storage         — Local file read/write/append
+ynab            — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+exit_loop       — ADK built-in: signal loop completion
+google_search   — ADK built-in: Google Search grounding
+load_memory     — ADK built-in: load from memory service
 ```
 
 List custom tools: `pyflow list --tools`
@@ -337,6 +340,8 @@ sequential  — Pipeline: A then B then C    (requires: agents)
 parallel    — Fan-out: A, B, C at once     (requires: agents)
 loop        — Repeat until done            (requires: agents; optional: max_iterations)
 dag         — Dependency graph             (requires: nodes with depends_on)
-react       — Reasoning + acting           (requires: agent; optional: planner)
+react       — Reasoning + acting           (requires: agent; optional: planner, planner_config)
 llm_routed  — LLM delegates to specialists (requires: router, agents)
 ```
+
+Planners for react: `plan_react` (PlanReAct), `builtin` (Gemini BuiltInPlanner with optional `planner_config.thinking_budget`).

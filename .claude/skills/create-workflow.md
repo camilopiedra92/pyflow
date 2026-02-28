@@ -68,13 +68,23 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 - name: analyzer
   type: llm
   model: gemini-2.5-flash
+  description: "Analyzes input data and produces structured summaries"
   instruction: "Analyze the data in {input_data} and provide a summary"
   tools: [http_request, condition]
   output_key: analysis
+  temperature: 0.3
 ```
 
 **Required fields:** `model`, `instruction`
-**Optional fields:** `tools`, `output_key`, `callbacks`
+**Optional fields:** `tools`, `output_key`, `callbacks`, `description`, `include_contents`, `output_schema`, `input_schema`, `temperature`, `max_output_tokens`, `top_p`, `top_k`, `agent_tools`
+
+**New LLM fields (post ADK alignment):**
+- `description` — used by `llm_routed` orchestration for agent routing (what does this agent do?)
+- `include_contents: "none"` — hides conversation history (isolated sub-tasks)
+- `output_schema` — JSON Schema dict, enforces structured JSON output via Pydantic model
+- `input_schema` — JSON Schema dict, enforces structured JSON input
+- `temperature`, `max_output_tokens`, `top_p`, `top_k` — generation config (controls LLM behavior)
+- `agent_tools: [agent_name]` — wraps other agents as callable tools (agent-as-tool composition)
 
 **Model strings:**
 - Gemini (native): `gemini-2.5-flash`, `gemini-2.5-pro`
@@ -87,7 +97,7 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus any custom tools in `pyflow/tools/`.
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (`exit_loop`, `google_search`, `load_memory`), plus any custom tools in `pyflow/tools/`.
 
 ### Expr Agent — inline safe expression
 
@@ -230,10 +240,14 @@ Agents with satisfied deps run in parallel. Validated at parse time for unknown 
 orchestration:
   type: react
   agent: reasoner
-  planner: plan_react       # optional
+  planner: plan_react       # optional: plan_react | builtin
+  planner_config:           # optional: for builtin planner
+    thinking_budget: 2048
 ```
 
-Wraps a single LLM agent with a planner for multi-step reasoning with tools.
+Wraps a single LLM agent with a planner for multi-step reasoning with tools. Supported planners:
+- `plan_react` — PlanReAct: plans before acting, good for data-heavy APIs
+- `builtin` — Gemini BuiltInPlanner with native thinking (accepts `planner_config.thinking_budget`)
 
 ### LLM-Routed — dynamic delegation
 
@@ -536,7 +550,7 @@ a2a:
 - **Referencing an agent name in orchestration that doesn't exist in agents list** — the `WorkflowDef` validator catches this at parse time
 - **Forgetting `output_key`** on agents that need to pass data downstream — without it, the result doesn't enter session state
 - **Using `{variable}` in expr/code agents** — those use `input_keys`, not template strings. Templates are for `llm` instructions and `tool_config` values only
-- **Expecting LLM output to be a dict** — LLM agents always write text to state, even if the text is valid JSON. To use individual fields from LLM JSON output, add a Code agent to parse it (see "Pattern: LLM → Code → Expr" in Data Flow)
+- **Expecting LLM output to be a dict** — LLM agents write text to state. To enforce structured JSON, use `output_schema` (enforces schema via Pydantic at the API level). Without `output_schema`, add a Code agent to parse JSON output (see "Pattern: LLM → Code → Expr" in Data Flow)
 - **Using `isinstance()` in ExprAgent** — `isinstance`, `type`, `dict`, `set`, `range`, `print` are NOT in the sandbox. Use `.get()` chains instead of `isinstance` checks. ExprAgent fails silently (error event) and downstream agents won't see the output_key
 - **Defining workflow agents before their sub-agents** — the hydrator builds leaf agents first, then resolves sub_agent references. Order in the YAML doesn't strictly matter (the hydrator does two passes), but defining leaves first is clearer
 - **Using `expr` when you need imports** — ExprAgent is sandboxed with no imports. Use `code` for anything that needs `import`
