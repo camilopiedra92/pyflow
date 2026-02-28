@@ -1,54 +1,34 @@
 from __future__ import annotations
 
-from typing import ClassVar
-
 import httpx
 from google.adk.tools.tool_context import ToolContext
 
-from pyflow.models.tool import ToolConfig, ToolResponse
 from pyflow.tools.base import BasePlatformTool
-
-
-class AlertToolConfig(ToolConfig):
-    """Configuration for sending webhook alerts."""
-
-    webhook_url: str
-    message: str
-
-
-class AlertToolResponse(ToolResponse):
-    """Response from an alert operation."""
-
-    status: int
-    sent: bool
-    error: str | None = None
+from pyflow.tools.security import is_private_url
 
 
 class AlertTool(BasePlatformTool):
-    """Send alert messages to webhook endpoints."""
-
-    name: ClassVar[str] = "alert"
-    description: ClassVar[str] = "Send alert messages to webhook URLs"
-    config_model: ClassVar[type[ToolConfig]] = AlertToolConfig
-    response_model: ClassVar[type[ToolResponse]] = AlertToolResponse
+    name = "alert"
+    description = "Send an alert message to a webhook URL."
 
     async def execute(
-        self, config: AlertToolConfig, tool_context: ToolContext | None = None
-    ) -> AlertToolResponse:
+        self,
+        tool_context: ToolContext,
+        webhook_url: str,
+        message: str,
+    ) -> dict:
+        """Send an alert to a webhook.
+
+        Args:
+            webhook_url: The webhook URL to POST the alert to.
+            message: The alert message to send.
+        """
+        if is_private_url(webhook_url):
+            return {"status": 0, "sent": False, "error": "SSRF blocked: private/internal URL"}
+
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    config.webhook_url,
-                    json={"message": config.message},
-                    timeout=30,
-                )
-            return AlertToolResponse(
-                status=response.status_code,
-                sent=True,
-            )
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(webhook_url, json={"message": message})
+                return {"status": resp.status_code, "sent": True, "error": None}
         except httpx.HTTPError as exc:
-            return AlertToolResponse(
-                status=0,
-                sent=False,
-                error=str(exc),
-            )
+            return {"status": 0, "sent": False, "error": str(exc)}

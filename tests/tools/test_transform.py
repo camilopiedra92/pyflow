@@ -1,87 +1,79 @@
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+import json
+from unittest.mock import MagicMock
 
-from pyflow.tools.transform import TransformTool, TransformToolConfig, TransformToolResponse
-
-
-class TestTransformToolConfig:
-    def test_fields(self):
-        config = TransformToolConfig(input={"items": [1, 2, 3]}, expression="$.items[0]")
-        assert config.input == {"items": [1, 2, 3]}
-        assert config.expression == "$.items[0]"
-
-    def test_expression_required(self):
-        with pytest.raises(ValidationError):
-            TransformToolConfig(input={"a": 1})
-
-    def test_input_required(self):
-        with pytest.raises(ValidationError):
-            TransformToolConfig(expression="$.a")
-
-
-class TestTransformToolResponse:
-    def test_fields(self):
-        resp = TransformToolResponse(result=[1, 2, 3])
-        assert resp.result == [1, 2, 3]
+from pyflow.tools.transform import TransformTool
 
 
 class TestTransformToolExecute:
-    async def test_simple_jsonpath(self):
+    async def test_simple_property(self):
         tool = TransformTool()
-        config = TransformToolConfig(
-            input={"name": "pyflow", "version": "1.0"},
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"name": "pyflow", "version": "1.0"}),
             expression="$.name",
         )
-        result = await tool.execute(config)
-        assert isinstance(result, TransformToolResponse)
-        assert result.result == "pyflow"
+        assert isinstance(result, dict)
+        assert result["result"] == "pyflow"
 
-    async def test_array_index(self):
+    async def test_array_indexing(self):
         tool = TransformTool()
-        config = TransformToolConfig(
-            input={"items": ["a", "b", "c"]},
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"items": ["a", "b", "c"]}),
             expression="$.items[1]",
         )
-        result = await tool.execute(config)
-        assert result.result == "b"
-
-    async def test_nested_path(self):
-        tool = TransformTool()
-        config = TransformToolConfig(
-            input={"data": {"nested": {"value": 42}}},
-            expression="$.data.nested.value",
-        )
-        result = await tool.execute(config)
-        assert result.result == 42
+        assert result["result"] == "b"
 
     async def test_wildcard_returns_list(self):
         tool = TransformTool()
-        config = TransformToolConfig(
-            input={"items": [{"id": 1}, {"id": 2}, {"id": 3}]},
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"items": [{"id": 1}, {"id": 2}, {"id": 3}]}),
             expression="$.items[*].id",
         )
-        result = await tool.execute(config)
-        assert result.result == [1, 2, 3]
+        assert result["result"] == [1, 2, 3]
+
+    async def test_nested_path(self):
+        tool = TransformTool()
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"data": {"nested": {"value": 42}}}),
+            expression="$.data.nested.value",
+        )
+        assert result["result"] == 42
 
     async def test_no_match_returns_none(self):
         tool = TransformTool()
-        config = TransformToolConfig(
-            input={"a": 1},
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"a": 1}),
             expression="$.nonexistent",
         )
-        result = await tool.execute(config)
-        assert result.result is None
+        assert result["result"] is None
+        assert "error" not in result
 
-    async def test_invalid_expression(self):
+    async def test_invalid_expression_returns_error(self):
         tool = TransformTool()
-        config = TransformToolConfig(
-            input={"a": 1},
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data=json.dumps({"a": 1}),
             expression="not a valid jsonpath [[[",
         )
-        result = await tool.execute(config)
-        assert result.result is None
+        assert result["result"] is None
+        assert "error" in result
+        assert "JSONPath error" in result["error"]
+
+    async def test_invalid_json_input_returns_error(self):
+        tool = TransformTool()
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            input_data="not valid json{{{",
+            expression="$.name",
+        )
+        assert result["result"] is None
+        assert result["error"] == "Invalid JSON input"
 
     def test_auto_registered(self):
         from pyflow.tools.base import get_registered_tools

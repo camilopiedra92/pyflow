@@ -1,42 +1,9 @@
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+import json
+from unittest.mock import MagicMock
 
-from pyflow.tools.storage import StorageTool, StorageToolConfig, StorageToolResponse
-
-
-class TestStorageToolConfig:
-    def test_defaults(self):
-        config = StorageToolConfig(path="/tmp/test.txt")
-        assert config.action == "read"
-        assert config.data is None
-
-    def test_all_fields(self):
-        config = StorageToolConfig(path="/tmp/test.txt", action="write", data="hello")
-        assert config.path == "/tmp/test.txt"
-        assert config.action == "write"
-        assert config.data == "hello"
-
-    def test_invalid_action(self):
-        with pytest.raises(ValidationError):
-            StorageToolConfig(path="/tmp/test.txt", action="delete")
-
-    def test_path_required(self):
-        with pytest.raises(ValidationError):
-            StorageToolConfig()
-
-
-class TestStorageToolResponse:
-    def test_fields(self):
-        resp = StorageToolResponse(content="hello", success=True)
-        assert resp.content == "hello"
-        assert resp.success is True
-
-    def test_defaults(self):
-        resp = StorageToolResponse()
-        assert resp.content is None
-        assert resp.success is True
+from pyflow.tools.storage import StorageTool
 
 
 class TestStorageToolExecute:
@@ -45,59 +12,94 @@ class TestStorageToolExecute:
         filepath = str(tmp_path / "test.txt")
 
         # Write
-        write_config = StorageToolConfig(path=filepath, action="write", data="hello world")
-        write_result = await tool.execute(write_config)
-        assert write_result.success is True
+        write_result = await tool.execute(
+            tool_context=MagicMock(),
+            path=filepath,
+            action="write",
+            data="hello world",
+        )
+        assert write_result["success"] is True
+        assert write_result["content"] == "hello world"
 
         # Read
-        read_config = StorageToolConfig(path=filepath, action="read")
-        read_result = await tool.execute(read_config)
-        assert read_result.success is True
-        assert read_result.content == "hello world"
+        read_result = await tool.execute(
+            tool_context=MagicMock(),
+            path=filepath,
+            action="read",
+        )
+        assert read_result["success"] is True
+        assert read_result["content"] == "hello world"
 
     async def test_append(self, tmp_path):
         tool = StorageTool()
         filepath = str(tmp_path / "append.txt")
 
         # Write initial
-        await tool.execute(StorageToolConfig(path=filepath, action="write", data="line1\n"))
+        await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="write", data="line1\n"
+        )
         # Append
-        await tool.execute(StorageToolConfig(path=filepath, action="append", data="line2\n"))
+        await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="append", data="line2\n"
+        )
 
         # Read
-        result = await tool.execute(StorageToolConfig(path=filepath, action="read"))
-        assert result.content == "line1\nline2\n"
+        result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="read"
+        )
+        assert result["content"] == "line1\nline2\n"
 
-    async def test_read_nonexistent(self, tmp_path):
+    async def test_read_nonexistent_file(self, tmp_path):
         tool = StorageTool()
         filepath = str(tmp_path / "nonexistent.txt")
 
-        result = await tool.execute(StorageToolConfig(path=filepath, action="read"))
-        assert result.success is False
-        assert result.content is None
+        result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="read"
+        )
+        assert result["success"] is False
+        assert result["content"] is None
+        assert result["error"] == "File not found"
 
-    async def test_write_creates_parent_dirs(self, tmp_path):
+    async def test_write_creates_nested_dirs(self, tmp_path):
         tool = StorageTool()
         filepath = str(tmp_path / "sub" / "dir" / "file.txt")
 
-        result = await tool.execute(StorageToolConfig(path=filepath, action="write", data="nested"))
-        assert result.success is True
+        result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="write", data="nested"
+        )
+        assert result["success"] is True
 
-        read_result = await tool.execute(StorageToolConfig(path=filepath, action="read"))
-        assert read_result.content == "nested"
+        read_result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="read"
+        )
+        assert read_result["content"] == "nested"
 
-    async def test_write_dict_data(self, tmp_path):
+    async def test_dict_data_as_json_string(self, tmp_path):
         tool = StorageTool()
         filepath = str(tmp_path / "dict.json")
 
+        data_str = json.dumps({"key": "value"})
         result = await tool.execute(
-            StorageToolConfig(path=filepath, action="write", data={"key": "value"})
+            tool_context=MagicMock(), path=filepath, action="write", data=data_str
         )
-        assert result.success is True
+        assert result["success"] is True
 
-        read_result = await tool.execute(StorageToolConfig(path=filepath, action="read"))
-        assert read_result.success is True
-        assert "key" in read_result.content
+        read_result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="read"
+        )
+        assert read_result["success"] is True
+        parsed = json.loads(read_result["content"])
+        assert parsed == {"key": "value"}
+
+    async def test_unknown_action(self, tmp_path):
+        tool = StorageTool()
+        filepath = str(tmp_path / "test.txt")
+
+        result = await tool.execute(
+            tool_context=MagicMock(), path=filepath, action="delete"
+        )
+        assert result["success"] is False
+        assert "Unknown action" in result["error"]
 
     def test_auto_registered(self):
         from pyflow.tools.base import get_registered_tools

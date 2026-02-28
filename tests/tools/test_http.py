@@ -1,130 +1,17 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from pydantic import ValidationError
 
-from pyflow.tools.http import HttpTool, HttpToolConfig, HttpToolResponse, _is_private_url
-
-
-class TestHttpToolConfig:
-    def test_defaults(self):
-        config = HttpToolConfig(url="https://example.com")
-        assert config.method == "GET"
-        assert config.headers == {}
-        assert config.body is None
-        assert config.timeout == 30
-
-    def test_all_fields(self):
-        config = HttpToolConfig(
-            url="https://api.example.com/data",
-            method="POST",
-            headers={"Authorization": "Bearer token"},
-            body={"key": "value"},
-            timeout=60,
-        )
-        assert config.url == "https://api.example.com/data"
-        assert config.method == "POST"
-        assert config.headers == {"Authorization": "Bearer token"}
-        assert config.body == {"key": "value"}
-        assert config.timeout == 60
-
-    def test_invalid_method(self):
-        with pytest.raises(ValidationError):
-            HttpToolConfig(url="https://example.com", method="INVALID")
-
-    def test_timeout_min(self):
-        with pytest.raises(ValidationError):
-            HttpToolConfig(url="https://example.com", timeout=0)
-
-    def test_timeout_max(self):
-        with pytest.raises(ValidationError):
-            HttpToolConfig(url="https://example.com", timeout=301)
-
-    def test_url_required(self):
-        with pytest.raises(ValidationError):
-            HttpToolConfig()
-
-    def test_allow_private_default_false(self):
-        config = HttpToolConfig(url="https://example.com")
-        assert config.allow_private is False
-
-    def test_allow_private_explicit(self):
-        config = HttpToolConfig(url="http://localhost:8080", allow_private=True)
-        assert config.allow_private is True
-
-
-class TestSSRFProtection:
-    """Test that private/internal network URLs are blocked by default."""
-
-    @pytest.mark.parametrize("url", [
-        "http://127.0.0.1/admin",
-        "http://localhost/secret",
-        "http://localhost:8080/api",
-        "http://10.0.0.1/internal",
-        "http://10.255.255.255/data",
-        "http://172.16.0.1/data",
-        "http://172.31.255.255/data",
-        "http://192.168.1.1/router",
-        "http://192.168.0.100:3000/api",
-        "http://169.254.169.254/latest/meta-data/",
-        "http://[::1]/ipv6-loopback",
-        "http://0.0.0.0/zero",
-    ])
-    def test_private_url_detected(self, url):
-        assert _is_private_url(url) is True
-
-    @pytest.mark.parametrize("url", [
-        "https://api.example.com/data",
-        "https://8.8.8.8/dns",
-        "https://httpbin.org/get",
-        "http://93.184.216.34/public",
-    ])
-    def test_public_url_allowed(self, url):
-        assert _is_private_url(url) is False
-
-    async def test_ssrf_blocked_by_default(self):
-        tool = HttpTool()
-        config = HttpToolConfig(url="http://169.254.169.254/latest/meta-data/")
-        result = await tool.execute(config)
-        assert result.status == 0
-        assert "blocked" in str(result.body).lower() or "private" in str(result.body).lower()
-
-    async def test_ssrf_allowed_when_configured(self):
-        tool = HttpTool()
-        config = HttpToolConfig(url="http://localhost:8080/api", allow_private=True)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.headers = httpx.Headers({"content-type": "application/json"})
-        mock_response.json.return_value = {"local": True}
-        mock_response.text = '{"local": true}'
-
-        mock_client = AsyncMock()
-        mock_client.request = AsyncMock(return_value=mock_response)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await tool.execute(config)
-
-        assert result.status == 200
-
-
-class TestHttpToolResponse:
-    def test_fields(self):
-        resp = HttpToolResponse(status=200, headers={"content-type": "application/json"}, body={"ok": True})
-        assert resp.status == 200
-        assert resp.headers == {"content-type": "application/json"}
-        assert resp.body == {"ok": True}
+from pyflow.tools.http import HttpTool
 
 
 class TestHttpToolExecute:
     async def test_get_request(self):
         tool = HttpTool()
-        config = HttpToolConfig(url="https://example.com/api")
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -137,21 +24,24 @@ class TestHttpToolExecute:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await tool.execute(config)
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                url="https://example.com/api",
+            )
 
-        assert isinstance(result, HttpToolResponse)
-        assert result.status == 200
-        mock_client.request.assert_called_once()
-
-    async def test_post_with_body(self):
-        tool = HttpTool()
-        config = HttpToolConfig(
+        assert isinstance(result, dict)
+        assert result["status"] == 200
+        assert result["body"] == {"data": "test"}
+        mock_client.request.assert_called_once_with(
+            method="GET",
             url="https://example.com/api",
-            method="POST",
-            body={"key": "value"},
-            headers={"Content-Type": "application/json"},
+            headers={},
+            json=None,
         )
+
+    async def test_post_with_json_body_and_headers(self):
+        tool = HttpTool()
 
         mock_response = MagicMock()
         mock_response.status_code = 201
@@ -164,25 +54,128 @@ class TestHttpToolExecute:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await tool.execute(config)
+        headers_json = json.dumps({"Authorization": "Bearer token123"})
+        body_json = json.dumps({"key": "value"})
 
-        assert result.status == 201
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                url="https://example.com/api",
+                method="POST",
+                headers=headers_json,
+                body=body_json,
+            )
 
-    async def test_http_error_handled(self):
+        assert result["status"] == 201
+        assert result["body"] == {"created": True}
+        mock_client.request.assert_called_once_with(
+            method="POST",
+            url="https://example.com/api",
+            headers={"Authorization": "Bearer token123"},
+            json={"key": "value"},
+        )
+
+    async def test_ssrf_blocked_by_default(self):
         tool = HttpTool()
-        config = HttpToolConfig(url="https://example.com/fail")
+        result = await tool.execute(
+            tool_context=MagicMock(),
+            url="http://169.254.169.254/latest/meta-data/",
+        )
+        assert result["status"] == 0
+        assert "SSRF blocked" in result["error"]
+
+    async def test_ssrf_allowed_with_flag(self):
+        tool = HttpTool()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = httpx.Headers({"content-type": "application/json"})
+        mock_response.json.return_value = {"local": True}
+        mock_response.text = '{"local": true}'
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                url="http://localhost:8080/api",
+                allow_private=True,
+            )
+
+        assert result["status"] == 200
+        assert result["body"] == {"local": True}
+
+    async def test_network_error(self):
+        tool = HttpTool()
 
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(side_effect=httpx.HTTPError("connection failed"))
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = await tool.execute(config)
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                url="https://example.com/fail",
+            )
 
-        assert result.status == 0
-        assert "connection failed" in str(result.body)
+        assert result["status"] == 0
+        assert "connection failed" in result["error"]
+
+    async def test_invalid_json_headers_gracefully_handled(self):
+        """Invalid JSON headers string should fall back to empty dict."""
+        tool = HttpTool()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = httpx.Headers({})
+        mock_response.json.return_value = {}
+        mock_response.text = "{}"
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client):
+            result = await tool.execute(
+                tool_context=MagicMock(),
+                url="https://example.com/api",
+                headers="not valid json{{{",
+            )
+
+        assert result["status"] == 200
+        # Invalid JSON headers should fall back to empty dict
+        mock_client.request.assert_called_once()
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["headers"] == {}  # safe_json_parse returns default={}
+
+    async def test_timeout_clamped(self):
+        """Timeout values are clamped to [1, 300]."""
+        tool = HttpTool()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = httpx.Headers({})
+        mock_response.json.return_value = {}
+        mock_response.text = "{}"
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("pyflow.tools.http.httpx.AsyncClient", return_value=mock_client) as mock_cls:
+            await tool.execute(
+                tool_context=MagicMock(),
+                url="https://example.com/api",
+                timeout=0,
+            )
+            # Should be clamped to 1
+            mock_cls.assert_called_once_with(timeout=1)
 
     def test_auto_registered(self):
         from pyflow.tools.base import get_registered_tools

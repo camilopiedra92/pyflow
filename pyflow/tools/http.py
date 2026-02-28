@@ -1,101 +1,63 @@
 from __future__ import annotations
 
-import ipaddress
-from typing import Any, ClassVar, Literal
-from urllib.parse import urlparse
-
 import httpx
 from google.adk.tools.tool_context import ToolContext
-from pydantic import Field
 
-from pyflow.models.tool import ToolConfig, ToolResponse
 from pyflow.tools.base import BasePlatformTool
-
-# Hostnames that resolve to private/loopback addresses
-_PRIVATE_HOSTNAMES = frozenset({"localhost"})
-
-
-def _is_private_url(url: str) -> bool:
-    """Check if a URL targets a private or internal network address."""
-    try:
-        parsed = urlparse(url)
-        hostname = parsed.hostname or ""
-
-        # Check well-known private hostnames
-        if hostname.lower() in _PRIVATE_HOSTNAMES:
-            return True
-
-        # Strip IPv6 brackets if present
-        clean = hostname.strip("[]")
-
-        # Try parsing as IP address
-        addr = ipaddress.ip_address(clean)
-        return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
-    except (ValueError, TypeError):
-        # Not an IP — assume it's a public hostname
-        return False
-
-
-class HttpToolConfig(ToolConfig):
-    """Configuration for HTTP requests."""
-
-    url: str
-    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"] = "GET"
-    headers: dict[str, str] = {}
-    body: Any = None
-    timeout: int = Field(default=30, ge=1, le=300)
-    allow_private: bool = Field(
-        default=False,
-        description="Allow requests to private/internal network addresses (SSRF protection bypass)",
-    )
-
-
-class HttpToolResponse(ToolResponse):
-    """Response from an HTTP request."""
-
-    status: int
-    headers: dict[str, str]
-    body: Any
+from pyflow.tools.parsing import safe_json_parse
+from pyflow.tools.security import is_private_url
 
 
 class HttpTool(BasePlatformTool):
-    """Make HTTP requests to external APIs."""
-
-    name: ClassVar[str] = "http_request"
-    description: ClassVar[str] = "Make HTTP requests to external APIs and services"
-    config_model: ClassVar[type[ToolConfig]] = HttpToolConfig
-    response_model: ClassVar[type[ToolResponse]] = HttpToolResponse
+    name = "http_request"
+    description = (
+        "Make HTTP requests to external APIs. "
+        "Pass headers and body as JSON strings."
+    )
 
     async def execute(
-        self, config: HttpToolConfig, tool_context: ToolContext | None = None
-    ) -> HttpToolResponse:
-        if not config.allow_private and _is_private_url(config.url):
-            return HttpToolResponse(
-                status=0,
-                headers={},
-                body={"error": "Request blocked: URL targets a private/internal network address"},
-            )
+        self,
+        tool_context: ToolContext,
+        url: str,
+        method: str = "GET",
+        headers: str = "{}",
+        body: str = "",
+        timeout: int = 30,
+        allow_private: bool = False,
+    ) -> dict:
+        """Make an HTTP request.
+
+        Args:
+            url: The URL to request.
+            method: HTTP method (GET, POST, PUT, DELETE, PATCH).
+            headers: JSON string of headers.
+            body: JSON string of request body.
+            timeout: Request timeout in seconds (1-300).
+            allow_private: Allow requests to private network addresses.
+        """
+        if not allow_private and is_private_url(url):
+            return {"status": 0, "error": "SSRF blocked: private/internal URL"}
+
+        timeout = max(1, min(timeout, 300))
+        parsed_headers = safe_json_parse(headers, default={})
+        parsed_body = safe_json_parse(body)
+
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.request(
-                    method=config.method,
-                    url=config.url,
-                    headers=config.headers,
-                    json=config.body if config.body is not None else None,
-                    timeout=config.timeout,
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.request(
+                    method=method.upper(),
+                    url=url,
+                    headers=parsed_headers,
+                    json=parsed_body if parsed_body is not None else None,
                 )
-            try:
-                body = response.json()
-            except Exception:
-                body = response.text
-            return HttpToolResponse(
-                status=response.status_code,
-                headers=dict(response.headers),
-                body=body,
-            )
+                try:
+                    resp_body = resp.json()
+                except Exception:
+                    resp_body = resp.text
+                return {
+                    "status": resp.status_code,
+                    "headers": dict(resp.headers),
+                    "body": resp_body,
+                }
         except httpx.HTTPError as exc:
-            return HttpToolResponse(
-                status=0,
-                headers={},
-                body={"error": str(exc)},
-            )
+            return {"status": 0, "error": str(exc)}
