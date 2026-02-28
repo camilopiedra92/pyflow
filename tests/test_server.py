@@ -114,7 +114,7 @@ class TestWorkflows:
 
         response = await client.post(
             "/api/workflows/test/run",
-            json={"message": "hello", "data": {}},
+            json={"message": "hello"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -123,7 +123,7 @@ class TestWorkflows:
         assert data["result"]["author"] == "test-agent"
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test",
-            {"message": "hello", "data": {}},
+            {"message": "hello"},
             user_id="default",
         )
 
@@ -133,12 +133,12 @@ class TestWorkflows:
 
         response = await client.post(
             "/api/workflows/test/run",
-            json={"message": "hello", "data": {}, "user_id": "alice"},
+            json={"message": "hello", "user_id": "alice"},
         )
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test",
-            {"message": "hello", "data": {}},
+            {"message": "hello"},
             user_id="alice",
         )
 
@@ -154,7 +154,7 @@ class TestWorkflows:
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test",
-            {"message": "hi", "data": {}},
+            {"message": "hi"},
             user_id="default",
         )
 
@@ -163,7 +163,7 @@ class TestWorkflows:
 
         response = await client.post(
             "/api/workflows/test/run",
-            json={"message": "", "data": {}},
+            json={"message": ""},
         )
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -173,7 +173,7 @@ class TestWorkflows:
 
         response = await client.post(
             "/api/workflows/test/run",
-            json={"message": "", "data": {}},
+            json={"message": ""},
         )
         assert response.status_code == 500
         data = response.json()
@@ -239,7 +239,7 @@ class TestA2A:
 
         response = await client.post(
             "/a2a/test-wf",
-            json={"message": "run it", "data": {}},
+            json={"message": "run it"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -248,7 +248,7 @@ class TestA2A:
         assert data["result"]["author"] == "a2a-agent"
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test-wf",
-            {"message": "run it", "data": {}},
+            {"message": "run it"},
             user_id="default",
         )
 
@@ -258,12 +258,12 @@ class TestA2A:
 
         response = await client.post(
             "/a2a/test-wf",
-            json={"message": "run it", "data": {}, "user_id": "bob"},
+            json={"message": "run it", "user_id": "bob"},
         )
         assert response.status_code == 200
         client._mock_platform.run_workflow.assert_awaited_once_with(
             "test-wf",
-            {"message": "run it", "data": {}},
+            {"message": "run it"},
             user_id="bob",
         )
 
@@ -272,7 +272,7 @@ class TestA2A:
 
         response = await client.post(
             "/a2a/unknown-wf",
-            json={"message": "", "data": {}},
+            json={"message": ""},
         )
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -282,7 +282,7 @@ class TestA2A:
 
         response = await client.post(
             "/a2a/test-wf",
-            json={"message": "", "data": {}},
+            json={"message": ""},
         )
         assert response.status_code == 500
         data = response.json()

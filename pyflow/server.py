@@ -78,7 +78,6 @@ async def list_workflows():
 
 class WorkflowInput(BaseModel):
     message: str = ""
-    data: dict = {}
     user_id: str = "default"
 
 
