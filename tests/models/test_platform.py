@@ -9,7 +9,6 @@ from pyflow.models.platform import PlatformConfig
 class TestPlatformConfig:
     def test_defaults(self):
         config = PlatformConfig()
-        assert config.tools_dir == "pyflow/tools"
         assert config.workflows_dir == "agents"
         assert config.log_level == "INFO"
         assert config.host == "0.0.0.0"
@@ -17,13 +16,11 @@ class TestPlatformConfig:
 
     def test_overrides(self):
         config = PlatformConfig(
-            tools_dir="custom/tools",
             workflows_dir="custom/workflows",
             log_level="DEBUG",
             host="127.0.0.1",
             port=9000,
         )
-        assert config.tools_dir == "custom/tools"
         assert config.workflows_dir == "custom/workflows"
         assert config.log_level == "DEBUG"
         assert config.host == "127.0.0.1"

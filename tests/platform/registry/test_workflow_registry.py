@@ -58,10 +58,15 @@ def registry() -> WorkflowRegistry:
 # -- Tests --------------------------------------------------------------------
 
 
-def test_discover_loads_yaml_files(tmp_path: Path, registry: WorkflowRegistry) -> None:
-    """discover() should load all YAML files from a directory into the registry."""
-    (tmp_path / "workflow1.yaml").write_text(_VALID_WORKFLOW_YAML)
-    (tmp_path / "workflow2.yaml").write_text(_SECOND_WORKFLOW_YAML)
+def test_discover_loads_agent_packages(tmp_path: Path, registry: WorkflowRegistry) -> None:
+    """discover() should load agent packages (subdirs with workflow.yaml)."""
+    pkg1 = tmp_path / "pkg1"
+    pkg1.mkdir()
+    (pkg1 / "workflow.yaml").write_text(_VALID_WORKFLOW_YAML)
+
+    pkg2 = tmp_path / "pkg2"
+    pkg2.mkdir()
+    (pkg2 / "workflow.yaml").write_text(_SECOND_WORKFLOW_YAML)
 
     registry.discover(tmp_path)
     assert len(registry) == 2
@@ -71,7 +76,9 @@ def test_discover_loads_yaml_files(tmp_path: Path, registry: WorkflowRegistry) -
 
 def test_discover_validates_yaml(tmp_path: Path, registry: WorkflowRegistry) -> None:
     """discover() should raise ValidationError for invalid workflow YAML."""
-    (tmp_path / "bad.yaml").write_text(_INVALID_WORKFLOW_YAML)
+    pkg = tmp_path / "bad_pkg"
+    pkg.mkdir()
+    (pkg / "workflow.yaml").write_text(_INVALID_WORKFLOW_YAML)
 
     with pytest.raises(ValidationError):
         registry.discover(tmp_path)
@@ -126,7 +133,9 @@ def test_get_unknown_raises_keyerror(registry: WorkflowRegistry) -> None:
 
 def test_list_workflows(tmp_path: Path, registry: WorkflowRegistry) -> None:
     """list_workflows() should return all WorkflowDef objects."""
-    (tmp_path / "wf.yaml").write_text(_VALID_WORKFLOW_YAML)
+    pkg = tmp_path / "wf_pkg"
+    pkg.mkdir()
+    (pkg / "workflow.yaml").write_text(_VALID_WORKFLOW_YAML)
     registry.discover(tmp_path)
 
     workflows = registry.list_workflows()
@@ -137,8 +146,12 @@ def test_list_workflows(tmp_path: Path, registry: WorkflowRegistry) -> None:
 
 def test_all_returns_hydrated_list(tmp_path: Path, registry: WorkflowRegistry) -> None:
     """all() should return list of HydratedWorkflow objects."""
-    (tmp_path / "wf1.yaml").write_text(_VALID_WORKFLOW_YAML)
-    (tmp_path / "wf2.yaml").write_text(_SECOND_WORKFLOW_YAML)
+    pkg1 = tmp_path / "pkg1"
+    pkg1.mkdir()
+    (pkg1 / "workflow.yaml").write_text(_VALID_WORKFLOW_YAML)
+    pkg2 = tmp_path / "pkg2"
+    pkg2.mkdir()
+    (pkg2 / "workflow.yaml").write_text(_SECOND_WORKFLOW_YAML)
     registry.discover(tmp_path)
 
     hydrated_list = registry.all()

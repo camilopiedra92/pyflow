@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 528 tests
+- `pytest -v` — run all 547 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -44,10 +44,10 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/platform/app.py` — PyFlowPlatform orchestrator (boot with .env loading, shutdown, run_workflow lifecycle)
 - `pyflow/platform/registry/tool_registry.py` — ToolRegistry: auto-discover + register tools
 - `pyflow/platform/registry/workflow_registry.py` — WorkflowRegistry: discover + hydrate YAML workflows
-- `pyflow/platform/registry/discovery.py` — Filesystem scanner for tools and agent packages
+- `pyflow/platform/registry/discovery.py` — Filesystem scanner for agent packages
 - `pyflow/platform/hydration/hydrator.py` — WorkflowHydrator: YAML -> Pydantic -> ADK Agent tree; `build_root_agent()` factory for agent packages
 - `pyflow/platform/hydration/schema.py` — json_schema_to_pydantic: JSON Schema -> dynamic Pydantic models
-- `pyflow/platform/executor.py` — WorkflowExecutor: wraps agent in ADK App, builds Runner, injects datetime state via GlobalInstructionPlugin
+- `pyflow/platform/executor.py` — WorkflowExecutor: builds Runner-per-run with ADK App, MetricsPlugin, datetime state via GlobalInstructionPlugin
 - `pyflow/platform/a2a/cards.py` — AgentCardGenerator: generate A2A cards from workflow definitions (opt-in via `a2a:` section)
 - `pyflow/tools/base.py` — BasePlatformTool ABC + auto-registration via `__init_subclass__`
 - `pyflow/tools/http.py` — HttpTool (httpx, SSRF protection)
@@ -56,12 +56,12 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
 - `pyflow/tools/ynab.py` — YnabTool (YNAB budget API: budgets, accounts, categories, payees, transactions)
-- `pyflow/models/workflow.py` — WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig
+- `pyflow/models/workflow.py` — WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig, OpenApiToolConfig
 - `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools, description, schemas, generation config, agent_tools)
 - `pyflow/models/tool.py` — ToolMetadata
 - `pyflow/platform/callbacks.py` — FQN-based callback resolution via `importlib` (Python dotted paths like `mypackage.callbacks.log_request`)
-- `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone, cors_origins)
+- `pyflow/models/platform.py` — PlatformConfig (pydantic-settings BaseSettings, timezone, cors_origins, telemetry)
 - `pyflow/cli.py` — Typer CLI (run, validate, list, init, serve)
 - `pyflow/server.py` — FastAPI server with REST + A2A endpoints + optional CORS middleware
 - `pyflow/config.py` — structlog configuration
@@ -94,9 +94,9 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `GlobalInstructionPlugin` injects `NOW: {current_datetime} ({timezone}).` into every LLM agent instruction at runtime — all agents are datetime-aware (moved from hydrator build-time to executor runtime via ADK plugin)
 - Executor injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session state
 - Executor wraps agent in ADK `App` model (`Runner(app=app)` instead of `Runner(agent=agent)`) — unlocks context caching, event compaction, resumability, app-level plugins
-- RuntimeConfig supports `context_cache_intervals/ttl/min_tokens` (Gemini 2.0+ context caching), `compaction_interval/overlap` (long conversation compaction), `resumable` (session resumability), `credential_service` (`in_memory` or `none`)
+- RuntimeConfig supports `context_cache_intervals/ttl/min_tokens` (Gemini 2.0+ context caching), `compaction_interval/overlap` (long conversation compaction), `resumable` (session resumability), `credential_service` (`in_memory` or `none`), `session_db_path` (SQLite path), `mcp_servers` (MCP server connections), `openapi_tools` (OpenAPI spec auto-generation)
 - Callbacks resolved via Python FQN (fully-qualified names) through `importlib` — e.g. `before_agent: "mypackage.callbacks.log_request"`. No manual registry needed
-- Plugin registry includes 6 ADK plugins: `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`
+- Plugin registry includes 7 ADK plugins: `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics` (requires `PYFLOW_BQ_PROJECT_ID`/`PYFLOW_BQ_DATASET_ID` env vars)
 - CORS middleware opt-in via `PlatformConfig.cors_origins` (env: `PYFLOW_CORS_ORIGINS`)
 - `PYFLOW_TIMEZONE` env var configures timezone (defaults to system timezone detection via `/etc/localtime`)
 - Platform auto-loads `.env` during `boot()` (ADK-aligned: walks from `workflows_dir` to root, preserves explicit env vars, respects `ADK_DISABLE_LOAD_DOTENV`). Disable via `PYFLOW_LOAD_DOTENV=false`
@@ -111,7 +111,7 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `buil
 
 ## Testing
 
-- 528 tests across 35 test files
+- 547 tests across 40 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
@@ -132,3 +132,4 @@ Each package contains: `__init__.py`, `agent.py` (exports `root_agent` via `buil
 - `litellm>=1.0` (optional) — multi-provider LLM support (Anthropic, OpenAI)
 - `pydantic-settings>=2.0` — env var and .env config loading (BaseSettings)
 - `python-dotenv` — .env file loading for CLI (transitive via pydantic-settings)
+- `PYFLOW_TELEMETRY_ENABLED` / `PYFLOW_TELEMETRY_EXPORT` — opt-in OpenTelemetry distributed tracing (`console`, `otlp`, `gcp`)

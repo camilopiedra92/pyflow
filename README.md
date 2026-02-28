@@ -4,7 +4,7 @@
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Tests: 482 passing](https://img.shields.io/badge/tests-482%20passing-brightgreen)
+![Tests: 547 passing](https://img.shields.io/badge/tests-547%20passing-brightgreen)
 ![Google ADK](https://img.shields.io/badge/powered%20by-Google%20ADK-4285F4)
 
 PyFlow is an agent platform that turns YAML workflow definitions into [Google ADK](https://google.github.io/adk-docs/) agent trees. Tools self-register at boot, agents compose into pipelines (sequential, parallel, loop, DAG), and the [A2A protocol](https://google.github.io/A2A/) makes every workflow discoverable by other agents.
@@ -31,17 +31,21 @@ PyFlow is an agent platform that turns YAML workflow definitions into [Google AD
 - **AST-validated eval** — `expr` agents and `condition` tool use a restricted Python sandbox (no imports, no IO, no `__dunder__` access)
 - **SSRF protection** — HTTP tool blocks requests to private/internal networks
 
-### Protocol
+### Protocol & Integrations
 
 - **A2A agent cards** — auto-generated from the `a2a:` section in workflow YAML; opt-in per workflow
 - **REST + A2A server** — FastAPI server exposes both REST endpoints and A2A protocol
+- **MCP tools** — connect to Model Context Protocol servers via `mcp_servers` in runtime config
+- **OpenAPI tools** — auto-generate tools from OpenAPI specs via `openapi_tools` in runtime config
 
 ### Developer Experience
 
 - **CLI** — `pyflow run`, `validate`, `list`, `init`, `serve`
-- **482 tests** across 35 test files — fully mocked, no real network or LLM calls
+- **547 tests** across 40 test files — fully mocked, no real network or LLM calls
 - **Fully typed** — Pydantic v2 models for all configs, responses, and workflow definitions
 - **Structured logging** — structlog with ISO timestamps
+- **OpenTelemetry** — opt-in tracing and metrics via platform telemetry config
+- **7 ADK plugins** — `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics`
 - **Datetime-aware** — platform injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session
 
 ---
@@ -306,11 +310,11 @@ These tools are available by name in any workflow — they're lazy-imported from
 pyflow/
   platform/
     app.py                    # PyFlowPlatform orchestrator (boot/shutdown lifecycle)
-    executor.py               # WorkflowExecutor (ADK Runner + datetime state injection)
+    executor.py               # WorkflowExecutor (ADK App model, builds Runner per-run, datetime state injection)
     registry/
       tool_registry.py        # Auto-discover + register tools
       workflow_registry.py    # Discover + hydrate YAML workflows
-      discovery.py            # Filesystem scanner for tools and agent packages
+      discovery.py            # Filesystem scanner for agent packages
     hydration/
       hydrator.py             # YAML -> Pydantic -> ADK agent tree + build_root_agent() factory
       schema.py               # JSON Schema -> dynamic Pydantic models (output_schema/input_schema)
@@ -328,10 +332,10 @@ pyflow/
     storage.py                # StorageTool (JSON file read/write/append)
     ynab.py                   # YnabTool (YNAB budget API, 19 actions)
   models/
-    workflow.py               # WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig
+    workflow.py               # WorkflowDef, OrchestrationConfig, A2AConfig, RuntimeConfig, McpServerConfig, OpenApiToolConfig
     agent.py                  # AgentConfig (model, instruction, tools, schemas, generation config)
     tool.py                   # ToolMetadata
-    platform.py               # PlatformConfig (pydantic-settings BaseSettings)
+    platform.py               # PlatformConfig (pydantic-settings BaseSettings, telemetry config)
   server.py                   # FastAPI server with REST + A2A endpoints
   cli.py                      # Typer CLI (run, validate, list, init, serve)
   config.py                   # structlog configuration
@@ -339,7 +343,7 @@ agents/
   exchange_tracker/           # 7-step pipeline: LLM → code → expr → tool → expr → expr → LLM
   budget_analyst/             # ReAct agent with BuiltInPlanner and YNAB tool
   example/                    # Simple sequential workflow (condition + transform)
-tests/                        # 482 tests across 35 files, mirrors source structure
+tests/                        # 547 tests across 40 files, mirrors source structure
 ```
 
 ### Platform Boot Sequence
@@ -433,7 +437,7 @@ ruff format .
 
 ### Testing
 
-- **482 tests** across 35 test files
+- **547 tests** across 40 test files
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
 - Server tests use `httpx.ASGITransport` for in-process FastAPI testing

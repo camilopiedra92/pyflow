@@ -13,7 +13,7 @@ from google.genai import types
 # TODO(ADK>=1.27): Remove when ADK fixes response logging for function_call parts
 logging.getLogger("google_genai.types").setLevel(logging.ERROR)
 
-from pyflow.models.runner import RunResult
+from pyflow.models.runner import RunResult, UsageSummary
 from pyflow.models.workflow import RuntimeConfig
 from pyflow.platform.metrics_plugin import MetricsPlugin
 from pyflow.platform.plugins import resolve_plugins
@@ -94,6 +94,9 @@ class WorkflowExecutor:
                 global_instruction="NOW: {current_datetime} ({timezone})."
             ),
         )
+        # Always include MetricsPlugin for per-run usage tracking
+        metrics = MetricsPlugin()
+        app_plugins.append(metrics)
 
         app_kwargs: dict = {
             "name": self._app_name,
@@ -128,6 +131,13 @@ class WorkflowExecutor:
             credential_service=self._build_credential_service(runtime),
         )
 
+    def _get_metrics_plugin(self, runner: Runner) -> MetricsPlugin | None:
+        """Find the MetricsPlugin from runner's plugin list."""
+        for plugin in runner.plugin_manager.plugins:
+            if isinstance(plugin, MetricsPlugin):
+                return plugin
+        return None
+
     async def _get_or_create_session(self, runner, user_id, session_id):
         """Get existing session or create a new one with datetime state."""
         state = self._datetime_state()
@@ -153,56 +163,56 @@ class WorkflowExecutor:
 
     async def run(
         self,
-        runner: Runner,
+        agent: BaseAgent,
+        runtime: RuntimeConfig,
         user_id: str = "default",
         message: str = "",
         session_id: str | None = None,
     ) -> RunResult:
         """Execute a workflow and collect results."""
-        metrics = MetricsPlugin()
-        runner.plugin_manager.plugins.append(metrics)
+        runner = self.build_runner(agent, runtime)
+        metrics = self._get_metrics_plugin(runner)
 
-        try:
-            session = await self._get_or_create_session(runner, user_id, session_id)
+        session = await self._get_or_create_session(runner, user_id, session_id)
 
-            content = types.Content(
-                role="user",
-                parts=[types.Part(text=message)],
-            )
+        content = types.Content(
+            role="user",
+            parts=[types.Part(text=message)],
+        )
 
-            final_event = None
-            async for event in runner.run_async(
-                user_id=user_id,
-                session_id=session.id,
-                new_message=content,
-            ):
-                if event.is_final_response() and event.content:
-                    final_event = event
+        final_event = None
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session.id,
+            new_message=content,
+        ):
+            if event.is_final_response() and event.content:
+                final_event = event
 
-            if final_event and final_event.content and final_event.content.parts:
-                text = "".join(p.text for p in final_event.content.parts if p.text)
-            else:
-                text = ""
+        if final_event and final_event.content and final_event.content.parts:
+            text = "".join(p.text for p in final_event.content.parts if p.text)
+        else:
+            text = ""
 
-            author = getattr(final_event, "author", "") or "" if final_event else ""
+        author = getattr(final_event, "author", "") or "" if final_event else ""
 
-            return RunResult(
-                content=text,
-                author=author,
-                usage=metrics.summary(),
-                session_id=session.id,
-            )
-        finally:
-            runner.plugin_manager.plugins.remove(metrics)
+        return RunResult(
+            content=text,
+            author=author,
+            usage=metrics.summary() if metrics else UsageSummary(),
+            session_id=session.id,
+        )
 
     async def run_streaming(
         self,
-        runner: Runner,
+        agent: BaseAgent,
+        runtime: RuntimeConfig,
         user_id: str = "default",
         message: str = "",
         session_id: str | None = None,
     ) -> AsyncGenerator:
         """Yield events as they arrive for streaming APIs."""
+        runner = self.build_runner(agent, runtime)
         session = await self._get_or_create_session(runner, user_id, session_id)
         content = types.Content(
             role="user",
@@ -221,10 +231,10 @@ class WorkflowExecutor:
             case "in_memory":
                 return InMemorySessionService()
             case "sqlite":
-                url = runtime.session_db_url or "sqlite+aiosqlite:///pyflow_sessions.db"
-                from google.adk.sessions.database_session_service import DatabaseSessionService
+                path = runtime.session_db_path or "pyflow_sessions.db"
+                from google.adk.sessions.sqlite_session_service import SqliteSessionService
 
-                return DatabaseSessionService(db_url=url)
+                return SqliteSessionService(db_path=path)
             case "database":
                 if not runtime.session_db_url:
                     raise ValueError("database session_service requires session_db_url")

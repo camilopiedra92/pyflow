@@ -25,11 +25,32 @@ class A2AConfig(BaseModel):
     skills: list[SkillDef] = []
 
 
+class McpServerConfig(BaseModel):
+    """Configuration for an MCP server connection."""
+
+    transport: Literal["sse", "stdio"]
+    # SSE transport
+    uri: str | None = None
+    headers: dict[str, str] | None = None
+    # Stdio transport
+    command: str | None = None
+    args: list[str] = []
+    env: dict[str, str] | None = None
+
+
+class OpenApiToolConfig(BaseModel):
+    """Configuration for auto-generating tools from an OpenAPI spec."""
+
+    spec: str  # Path to OpenAPI spec file (YAML or JSON)
+    name_prefix: str | None = None
+
+
 class RuntimeConfig(BaseModel):
     """ADK runtime service configuration for a workflow."""
 
     session_service: Literal["in_memory", "sqlite", "database"] = "in_memory"
     session_db_url: str | None = None
+    session_db_path: str | None = None
     memory_service: Literal["in_memory", "none"] = "none"
     artifact_service: Literal["in_memory", "file", "none"] = "none"
     artifact_dir: str | None = None
@@ -44,6 +65,10 @@ class RuntimeConfig(BaseModel):
     compaction_overlap: int | None = None
     # Resumability
     resumable: bool = False
+    # MCP tool servers
+    mcp_servers: list[McpServerConfig] = []
+    # OpenAPI tool generation
+    openapi_tools: list[OpenApiToolConfig] = []
 
 
 class DagNode(BaseModel):

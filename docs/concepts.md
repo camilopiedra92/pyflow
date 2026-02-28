@@ -743,6 +743,12 @@ runtime:
   compaction_overlap: null
   # Resumability
   resumable: false
+  # SQLite session path (used with session_service: sqlite)
+  session_db_path: null
+  # MCP server connections
+  mcp_servers: []
+  # OpenAPI tool generation
+  openapi_tools: []
 ```
 
 ### Session Service
@@ -752,15 +758,16 @@ Controls how conversation sessions (state, events, history) are persisted.
 | Value | Backend | Use when |
 |-------|---------|----------|
 | `in_memory` *(default)* | In-process dict | Development, testing, stateless workflows |
-| `sqlite` | SQLite via aiosqlite | Single-server persistence, local deployments |
+| `sqlite` | `SqliteSessionService(db_path=...)` | Single-server persistence, local deployments |
 | `database` | Any SQLAlchemy-compatible DB | Production, multi-server deployments |
 
-For `sqlite`, defaults to `sqlite+aiosqlite:///pyflow_sessions.db` if no `session_db_url` is provided. For `database`, `session_db_url` is required.
+For `sqlite`, uses ADK's dedicated `SqliteSessionService`. Defaults to `pyflow_sessions.db` if no `session_db_path` is provided. For `database`, `session_db_url` is required.
 
 ```yaml
-# Local persistence
+# Local persistence (uses SqliteSessionService)
 runtime:
   session_service: sqlite
+  session_db_path: "./data/sessions.db"
 
 # PostgreSQL
 runtime:
@@ -893,6 +900,7 @@ ADK plugins that hook into the agent lifecycle. The `GlobalInstructionPlugin` (d
 | `context_filter` | Filter conversation context before LLM calls |
 | `save_files_as_artifacts` | Auto-save generated files as artifacts |
 | `multimodal_tool_results` | Support multimodal tool return values |
+| `bigquery_analytics` | Agent analytics logging to BigQuery (requires `PYFLOW_BQ_PROJECT_ID`/`PYFLOW_BQ_DATASET_ID` env vars) |
 
 ```yaml
 runtime:
@@ -900,6 +908,35 @@ runtime:
 ```
 
 Unknown plugin names are silently skipped.
+
+### MCP Tools (Model Context Protocol)
+
+Connect external MCP servers to make their tools available in workflows:
+
+```yaml
+runtime:
+  mcp_servers:
+    - uri: "http://localhost:3000/sse"
+      transport: sse
+    - command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+      transport: stdio
+```
+
+MCP server tools become available by name in any agent's `tools:` list. Supports SSE and stdio transports.
+
+### OpenAPI Tools
+
+Auto-generate tools from OpenAPI specifications:
+
+```yaml
+runtime:
+  openapi_tools:
+    - spec: "specs/petstore.yaml"
+      name_prefix: "petstore"
+```
+
+Each operation in the spec becomes a callable tool, available by name (with optional prefix) in any agent's `tools:` list.
 
 ---
 
