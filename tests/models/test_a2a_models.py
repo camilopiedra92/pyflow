@@ -96,3 +96,35 @@ class TestAgentCard:
         assert data["url"] == "http://localhost:8000"
         assert len(data["skills"]) == 1
         assert data["skills"][0]["id"] == "s1"
+
+
+class TestAgentCardJsonParsing:
+    def test_parse_camel_case_json(self) -> None:
+        """AgentCard parses camelCase JSON keys from agent-card.json files."""
+        data = {
+            "name": "test",
+            "description": "desc",
+            "url": "http://localhost:8000/a2a/test",
+            "version": "1.0.0",
+            "protocolVersion": "0.3.0",
+            "defaultInputModes": ["application/json"],
+            "defaultOutputModes": ["text/plain"],
+            "skills": [],
+        }
+        card = AgentCard.model_validate(data)
+        assert card.protocol_version == "0.3.0"
+        assert card.default_input_modes == ["application/json"]
+        assert card.default_output_modes == ["text/plain"]
+
+    def test_parse_snake_case_still_works(self) -> None:
+        """AgentCard still accepts snake_case keys (backward compat)."""
+        data = {
+            "name": "test",
+            "url": "http://localhost:8000/a2a/test",
+            "protocol_version": "0.3.0",
+            "default_input_modes": ["text/plain"],
+            "default_output_modes": ["text/plain"],
+            "skills": [],
+        }
+        card = AgentCard.model_validate(data)
+        assert card.protocol_version == "0.3.0"
