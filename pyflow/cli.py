@@ -15,27 +15,9 @@ logger = structlog.get_logger()
 
 _INIT_AGENT_PY = '''\
 """{name} — ADK-compatible agent package."""
-from __future__ import annotations
+from pyflow.platform.hydration.hydrator import build_root_agent
 
-from pathlib import Path
-
-from pyflow.models.workflow import WorkflowDef
-from pyflow.platform.hydration.hydrator import WorkflowHydrator
-from pyflow.platform.registry.tool_registry import ToolRegistry
-
-_WORKFLOW_PATH = Path(__file__).parent / "workflow.yaml"
-
-
-def _build_agent():
-    """Hydrate YAML workflow into an ADK agent tree."""
-    tools = ToolRegistry()
-    tools.discover()
-    workflow = WorkflowDef.from_yaml(_WORKFLOW_PATH)
-    hydrator = WorkflowHydrator(tools)
-    return hydrator.hydrate(workflow)
-
-
-root_agent = _build_agent()
+root_agent = build_root_agent(__file__)
 '''
 
 _INIT_WORKFLOW_YAML = '''\
@@ -55,20 +37,6 @@ orchestration:
 
 runtime:
   session_service: in_memory
-'''
-
-_INIT_CARD_JSON = '''\
-{{
-  "name": "{name}",
-  "description": "{name} workflow",
-  "url": "http://localhost:8000/a2a/{name}",
-  "version": "1.0.0",
-  "protocolVersion": "0.2.6",
-  "capabilities": {{}},
-  "defaultInputModes": ["text/plain"],
-  "defaultOutputModes": ["application/json"],
-  "skills": []
-}}
 '''
 
 
@@ -181,7 +149,6 @@ def init(
     (pkg_dir / "__init__.py").write_text("from .agent import root_agent\n")
     (pkg_dir / "agent.py").write_text(_INIT_AGENT_PY.format(name=name))
     (pkg_dir / "workflow.yaml").write_text(_INIT_WORKFLOW_YAML.format(name=name))
-    (pkg_dir / "agent-card.json").write_text(_INIT_CARD_JSON.format(name=name))
     typer.echo(f"Created agent package: {pkg_dir}")
 
 

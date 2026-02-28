@@ -163,7 +163,6 @@ class TestInitCommand:
         assert pkg.is_dir()
         assert (pkg / "__init__.py").exists()
         assert (pkg / "agent.py").exists()
-        assert (pkg / "agent-card.json").exists()
         assert (pkg / "workflow.yaml").exists()
 
     def test_init_existing_package_fails(self, tmp_path: Path) -> None:
@@ -184,11 +183,9 @@ class TestInitCommand:
         wf = WorkflowDef(**data)
         assert wf.name == "test_agent"
 
-    def test_init_card_is_valid_json(self, tmp_path: Path) -> None:
-        """init command creates valid agent-card.json."""
-        import json
-
+    def test_init_agent_uses_factory(self, tmp_path: Path) -> None:
+        """init command creates agent.py that uses build_root_agent factory."""
         runner.invoke(app, ["init", "test_agent", "--agents-dir", str(tmp_path)])
-        card_path = tmp_path / "test_agent" / "agent-card.json"
-        data = json.loads(card_path.read_text())
-        assert data["name"] == "test_agent"
+        agent_py = (tmp_path / "test_agent" / "agent.py").read_text()
+        assert "build_root_agent" in agent_py
+        assert "root_agent = build_root_agent(__file__)" in agent_py
