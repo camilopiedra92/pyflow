@@ -81,8 +81,8 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 **New LLM fields (post ADK alignment):**
 - `description` — used by `llm_routed` orchestration for agent routing (what does this agent do?)
 - `include_contents: "none"` — hides conversation history (isolated sub-tasks)
-- `output_schema` — JSON Schema dict, enforces structured JSON output via Pydantic model
-- `input_schema` — JSON Schema dict, enforces structured JSON input
+- `output_schema` — JSON Schema dict, enforces structured JSON output via Pydantic model (see below)
+- `input_schema` — JSON Schema dict, enforces structured JSON input (same schema format)
 - `temperature`, `max_output_tokens`, `top_p`, `top_k` — generation config (controls LLM behavior)
 - `agent_tools: [agent_name]` — wraps other agents as callable tools (agent-as-tool composition)
 
@@ -98,6 +98,26 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
 **Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (`exit_loop`, `google_search`, `load_memory`), plus any custom tools in `pyflow/tools/`.
+
+**`output_schema` reference** — enforces structured JSON output at the API level. The LLM can only produce JSON matching this schema:
+
+```yaml
+- name: parser
+  type: llm
+  model: gemini-2.5-flash
+  instruction: "Extract the currency pair from the user's message"
+  output_key: parsed_input
+  temperature: 0
+  output_schema:
+    type: object
+    properties:
+      base: { type: string }
+      target: { type: string }
+      threshold: { type: number }
+    required: [base, target]
+```
+
+Supported JSON Schema types: `string`, `integer`, `number`, `boolean`, nested `object`, `array` (with `items`). Fields in `required` are mandatory; others default to `None`. Converted to Pydantic models at hydration time via `json_schema_to_pydantic()`. Use this instead of the "LLM → Code → Expr" pattern whenever possible — it eliminates JSON parsing errors entirely.
 
 ### Expr Agent — inline safe expression
 
