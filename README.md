@@ -12,7 +12,7 @@ Agent platform powered by Google ADK. Define multi-agent workflows in YAML, auto
 - **Fully Typed** -- Pydantic v2 models for all configs, responses, and workflow definitions
 - **Secure** -- AST-validated eval, SSRF protection on HTTP tool
 - **Datetime-Aware** -- Platform injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session
-- **412 Tests** -- Comprehensive suite with mocked ADK components
+- **430 Tests** -- Comprehensive suite with mocked ADK components
 
 ## Quickstart
 
@@ -27,11 +27,14 @@ pyflow run exchange_tracker
 pyflow serve
 
 # Validate a workflow
-pyflow validate workflows/exchange_tracker.yaml
+pyflow validate pyflow/agents/exchange_tracker/workflow.yaml
 
 # List tools and workflows
 pyflow list --tools
 pyflow list --workflows
+
+# Scaffold a new agent package
+pyflow init my_agent
 ```
 
 ## Example Workflow
@@ -125,7 +128,15 @@ pyflow/
       hydrator.py       -- YAML -> Pydantic -> ADK Agent tree
     executor.py       -- WorkflowExecutor (ADK Runner + datetime state injection)
     a2a/
-      cards.py          -- Auto-generate agent-card.json
+      cards.py          -- Load static agent-card.json from packages
+  agents/
+    exchange_tracker/
+      __init__.py       -- Package marker
+      agent.py          -- ADK agent entry point
+      agent-card.json   -- A2A agent card
+      workflow.yaml     -- Workflow definition
+    budget_analyst/
+      ...               -- Same structure per agent
   tools/
     base.py           -- BasePlatformTool ABC + auto-registration
     http.py           -- HTTP requests (httpx, SSRF protection)
@@ -140,7 +151,7 @@ pyflow/
     tool.py           -- ToolMetadata
     platform.py       -- PlatformConfig (BaseSettings, env vars)
   server.py           -- FastAPI server with REST + A2A endpoints
-  cli.py              -- Typer CLI (run, validate, list, serve)
+  cli.py              -- Typer CLI (run, validate, list, init, serve)
 ```
 
 ### Platform Boot Sequence
@@ -148,7 +159,7 @@ pyflow/
 ```
 boot() -> set_secrets()          -- inject config.secrets into tool secret store
        -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
-       -> workflows.discover()   -- scan workflows/, parse YAMLs into WorkflowDef
+       -> workflows.discover()   -- scan pyflow/agents/, discover packages
        -> workflows.hydrate()    -- resolve tool refs -> build ADK agent trees
        -> ready
 

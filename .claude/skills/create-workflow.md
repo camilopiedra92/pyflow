@@ -24,19 +24,22 @@ This skill guides the creation of YAML workflow definitions that PyFlow auto-dis
 
 When PyFlow boots, this happens automatically:
 
-1. **Discover** — scans `workflows/` for `.yaml` files
+1. **Discover** — scans `pyflow/agents/` for agent packages (subdirs with `workflow.yaml`)
 2. **Parse** — validates YAML against `WorkflowDef` Pydantic model
 3. **Hydrate** — resolves tool references and builds ADK agent tree
 4. **Ready** — workflow is executable via CLI, API, or programmatically
 
-No registration code needed. Just create a `.yaml` file in `workflows/`.
+No registration code needed. Run `pyflow init <name>` to scaffold a new agent package.
 
 ## Implementation Checklist
 
 1. Design agents and data flow
 2. Choose orchestration type
-3. Write `workflows/<name>.yaml`
-4. Validate: `source .venv/bin/activate && pyflow validate workflows/<name>.yaml`
+3. Scaffold the agent package and edit its files:
+   - `pyflow init <name>` to scaffold the package
+   - Edit `pyflow/agents/<name>/workflow.yaml`
+   - Edit `pyflow/agents/<name>/agent-card.json` if A2A skills needed
+4. Validate: `source .venv/bin/activate && pyflow validate pyflow/agents/<name>/workflow.yaml`
 5. If using custom code/tools, ensure they exist
 6. Test: `pyflow run <name> -i '{"message": "test input"}'`
 
@@ -351,7 +354,7 @@ a2a:
       tags: [finance, monitoring]
 ```
 
-Agent cards are auto-generated from workflow definitions and served at `/a2a/agent-card.json`.
+Agent cards are static JSON files (`agent-card.json`) in each agent package, loaded at boot. Edit `pyflow/agents/<name>/agent-card.json` to configure A2A metadata. Cards are served at `/a2a/agent-card.json`.
 
 ## Validation
 
@@ -365,7 +368,7 @@ Pydantic validates at multiple levels:
 Use the CLI to catch errors early:
 ```bash
 source .venv/bin/activate
-pyflow validate workflows/my_workflow.yaml
+pyflow validate pyflow/agents/my_workflow/workflow.yaml
 ```
 
 ## Complete Examples
