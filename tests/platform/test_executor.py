@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
-
 
 from pyflow.models.runner import RunResult
 from pyflow.models.workflow import RuntimeConfig
-from pyflow.platform.executor import WorkflowExecutor
+from pyflow.platform.executor import WorkflowExecutor, _detect_system_timezone
 
 
 class TestBuildRunner:
@@ -112,3 +112,63 @@ class TestRun:
         mock_runner.session_service.create_session.assert_called_once()
         call_kwargs = mock_runner.session_service.create_session.call_args[1]
         assert call_kwargs["user_id"] == "default"
+
+
+class TestDatetimeState:
+    def test_detect_system_timezone_returns_iana_name(self):
+        tz = _detect_system_timezone()
+        assert "/" in tz or tz == "UTC"
+
+    def test_datetime_state_has_required_keys(self):
+        executor = WorkflowExecutor(tz_name="America/Bogota")
+        state = executor._datetime_state()
+        assert "current_date" in state
+        assert "current_datetime" in state
+        assert "timezone" in state
+
+    def test_datetime_state_date_format(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        state = executor._datetime_state()
+        assert re.match(r"\d{4}-\d{2}-\d{2}$", state["current_date"])
+
+    def test_datetime_state_iso_format(self):
+        executor = WorkflowExecutor(tz_name="America/Bogota")
+        state = executor._datetime_state()
+        assert "T" in state["current_datetime"]
+        assert "-05:00" in state["current_datetime"]
+
+    def test_datetime_state_timezone_value(self):
+        executor = WorkflowExecutor(tz_name="Europe/London")
+        state = executor._datetime_state()
+        assert state["timezone"] == "Europe/London"
+
+    def test_custom_timezone_via_constructor(self):
+        executor = WorkflowExecutor(tz_name="Asia/Tokyo")
+        state = executor._datetime_state()
+        assert state["timezone"] == "Asia/Tokyo"
+        assert "+09:00" in state["current_datetime"]
+
+    def test_empty_tz_falls_back_to_system(self):
+        executor = WorkflowExecutor(tz_name="")
+        state = executor._datetime_state()
+        assert state["timezone"] != ""
+
+    async def test_session_created_with_datetime_state(self):
+        executor = WorkflowExecutor(tz_name="UTC")
+        mock_runner = MagicMock()
+        mock_session = MagicMock()
+        mock_session.id = "sess-1"
+        mock_runner.session_service.create_session = AsyncMock(return_value=mock_session)
+
+        async def fake_run(**kwargs):
+            return
+            yield
+
+        mock_runner.run_async = fake_run
+
+        await executor.run(mock_runner, message="hi")
+        call_kwargs = mock_runner.session_service.create_session.call_args[1]
+        assert "state" in call_kwargs
+        assert "current_date" in call_kwargs["state"]
+        assert "current_datetime" in call_kwargs["state"]
+        assert call_kwargs["state"]["timezone"] == "UTC"

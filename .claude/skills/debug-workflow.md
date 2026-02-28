@@ -227,11 +227,26 @@ expression: "x if isinstance(data, dict) else None"
 expression: "data.get('key', 'default')"
 ```
 
+### LLM uses wrong date
+
+The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM instruction automatically, and the executor injects the actual values into session state. If the agent still uses wrong dates:
+
+1. Check `PYFLOW_TIMEZONE` in `.env` — wrong timezone = wrong "today"
+2. The LLM may ignore the date prefix if the instruction is ambiguous — reinforce with explicit filtering guidance (e.g. "use since_date based on today's date")
+3. Verify the session state injection by checking executor tests
+
+### Rate limiting / ResourceExhausted
+
+Large API responses (e.g. unfiltered YNAB transactions = 167KB) fill the LLM context. With multi-turn ReAct loops, token usage multiplies. Gemini's free tier has 1M tokens/min.
+
+**Fix:** Instruct agents to ALWAYS filter data (e.g. `since_date` for transactions). Use PlanReAct instead of vanilla ReAct for data-heavy APIs — it plans filters before executing.
+
 ### Empty or missing output
 
 **No final response text:**
 1. Check that the last agent in the pipeline has `output_key` set
 2. Check that the LLM agent actually produces output (instruction may be unclear)
+3. For ReAct/PlanReAct agents, the final response may have multiple text parts — verify the executor joins all parts (not just `parts[0]`)
 
 **State key missing between agents:**
 1. Verify the producing agent has `output_key: key_name`
@@ -278,6 +293,8 @@ Error occurs
 │
 ├── Runs but wrong output?
 │   ├── Empty result → Check output_key on final agent
+│   ├── Wrong date → Check PYFLOW_TIMEZONE, reinforce date in instruction
+│   ├── ResourceExhausted → Filter data (since_date), use PlanReAct
 │   ├── Missing state between agents → Verify key names match
 │   ├── Agent error event → Read error message, fix input data
 │   └── Template not resolved → Check {variable} matches state key

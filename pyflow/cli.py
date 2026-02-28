@@ -37,7 +37,8 @@ def run(
         await platform.boot()
         try:
             result = await platform.run_workflow(workflow_name, input_data, user_id=user_id)
-            typer.echo(json.dumps(result, indent=2))
+            data = result.model_dump() if hasattr(result, "model_dump") else result
+            typer.echo(json.dumps(data, indent=2))
         finally:
             await platform.shutdown()
 

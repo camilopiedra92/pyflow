@@ -90,10 +90,13 @@ class WorkflowHydrator:
         tools = self._tool_registry.resolve_tools(config.tools) if config.tools else []
         callbacks = self._resolve_callbacks(config.callbacks)
 
+        instruction = config.instruction or ""
+        instruction = f"NOW: {{current_datetime}} ({{timezone}}).\n{instruction}"
+
         kwargs: dict = {
             "name": config.name,
             "model": model,
-            "instruction": config.instruction or "",
+            "instruction": instruction,
             "tools": tools,
             **callbacks,
         }

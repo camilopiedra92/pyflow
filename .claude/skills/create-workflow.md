@@ -80,6 +80,10 @@ The workhorse agent. Sends an instruction to an LLM, optionally with tools the L
 
 **Instructions can reference state** with `{variable_name}` — resolved from session state at runtime.
 
+**Automatic date awareness:** The hydrator automatically prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction. No manual setup needed — all LLM agents know the current date and time.
+
+**Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
+
 **Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus any custom tools in `pyflow/tools/`.
 
 ### Expr Agent — inline safe expression
@@ -242,6 +246,22 @@ An LLM router classifies the input and delegates to the appropriate sub-agent.
 ## Data Flow Patterns
 
 Agents communicate through **session state** — a shared key-value store that persists across the workflow execution.
+
+### Automatic date awareness
+
+The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction automatically. No manual setup needed.
+
+### Platform-injected state
+
+The executor injects these variables into every session at creation time:
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `{current_date}` | `2026-02-28` | ISO date in configured timezone |
+| `{current_datetime}` | `2026-02-28T15:30:00-05:00` | Full ISO datetime with offset |
+| `{timezone}` | `America/Bogota` | IANA timezone name |
+
+Configure via `PYFLOW_TIMEZONE` env var (defaults to system timezone auto-detection). These are also available for explicit use in `tool_config` values or expr/code agents via `input_keys`.
 
 ### Writing to state
 
@@ -471,6 +491,42 @@ orchestration:
   router: dispatcher
   agents: [billing, technical]
 ```
+
+### ReAct Agent with Tools
+
+A single LLM agent that autonomously decides which tool calls to make. Uses PlanReAct for structured multi-step reasoning.
+
+```yaml
+name: budget_analyst
+description: "Answer questions about your YNAB budget"
+
+agents:
+  - name: analyst
+    type: llm
+    model: gemini-2.5-flash
+    instruction: >
+      You are a budget analyst.
+      Start by calling list_budgets, then query as needed.
+      NEVER call list_transactions without since_date.
+    tools:
+      - ynab
+    output_key: analysis
+
+orchestration:
+  type: react
+  agent: analyst
+  planner: plan_react
+
+a2a:
+  version: "1.0.0"
+  skills:
+    - id: budget_analysis
+      name: "Budget Analysis"
+      description: "Analyze YNAB budget data"
+      tags: [finance, budget]
+```
+
+**Key lesson:** For APIs that return large responses, always instruct the agent to filter (e.g. `since_date`). PlanReAct plans filters before executing, saving tokens vs vanilla ReAct which fetches first.
 
 ## Common Mistakes
 

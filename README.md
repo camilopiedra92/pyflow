@@ -11,7 +11,8 @@ Agent platform powered by Google ADK. Define multi-agent workflows in YAML, auto
 - **A2A Protocol** -- Auto-generated agent cards with skills metadata for agent discovery
 - **Fully Typed** -- Pydantic v2 models for all configs, responses, and workflow definitions
 - **Secure** -- AST-validated eval, SSRF protection on HTTP tool
-- **404 Tests** -- Comprehensive suite with mocked ADK components
+- **Datetime-Aware** -- Platform injects `{current_date}`, `{current_datetime}`, `{timezone}` into every session
+- **412 Tests** -- Comprehensive suite with mocked ADK components
 
 ## Quickstart
 
@@ -122,10 +123,7 @@ pyflow/
       discovery.py         -- Filesystem scanner
     hydration/
       hydrator.py       -- YAML -> Pydantic -> ADK Agent tree
-    runner/
-      engine.py         -- PlatformRunner wrapping ADK Runner
-    session/
-      service.py        -- SessionManager wrapping ADK SessionService
+    executor.py       -- WorkflowExecutor (ADK Runner + datetime state injection)
     a2a/
       cards.py          -- Auto-generate agent-card.json
   tools/
@@ -152,8 +150,11 @@ boot() -> set_secrets()          -- inject config.secrets into tool secret store
        -> tools.discover()       -- scan tools/, auto-register via __init_subclass__
        -> workflows.discover()   -- scan workflows/, parse YAMLs into WorkflowDef
        -> workflows.hydrate()    -- resolve tool refs -> build ADK agent trees
-       -> sessions.initialize()  -- create ADK InMemorySessionService
        -> ready
+
+run()  -> create_session(state)  -- inject {current_date}, {current_datetime}, {timezone}
+       -> runner.run_async()     -- execute ADK agent tree
+       -> collect final response
 ```
 
 ## A2A Protocol

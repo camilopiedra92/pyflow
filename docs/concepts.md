@@ -202,9 +202,25 @@ orchestration:
 
 Agents communicate through **session state** — a shared key-value store.
 
-1. An agent writes results to `state[output_key]`
-2. The next agent reads from `state` via `input_keys` (for `code`/`expr`) or `{variable}` templates in instructions (for `llm`)
-3. ToolAgent resolves `{variable}` placeholders in `tool_config` from state
+1. The hydrator prepends `NOW: {current_datetime} ({timezone}).` to every LLM agent instruction
+2. The executor injects `current_date`, `current_datetime`, and `timezone` into session state
+3. An agent writes results to `state[output_key]`
+3. The next agent reads from `state` via `input_keys` (for `code`/`expr`) or `{variable}` templates in instructions (for `llm`)
+4. ToolAgent resolves `{variable}` placeholders in `tool_config` from state
+
+### Platform-Injected State
+
+Every session starts with these variables pre-populated:
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `{current_date}` | `2026-02-28` | ISO date in configured timezone |
+| `{current_datetime}` | `2026-02-28T15:30:00-05:00` | Full ISO datetime with timezone offset |
+| `{timezone}` | `America/Bogota` | IANA timezone name |
+
+Configure timezone via `PYFLOW_TIMEZONE` env var (defaults to system timezone).
+
+All LLM agents automatically receive `NOW: {current_datetime} ({timezone}).` as the first line of their instruction — no manual setup needed. The variables above are also available for explicit use in `tool_config` or `input_keys`.
 
 ```yaml
 agents:

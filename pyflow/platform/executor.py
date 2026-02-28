@@ -1,22 +1,79 @@
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
 from typing import AsyncGenerator
+from zoneinfo import ZoneInfo
 
 from google.adk.agents import BaseAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+# Suppress "non-text parts in the response" warning from google.genai SDK.
+# ADK's _build_response_log() accesses resp.text on responses containing
+# function_call parts, which is expected in ReAct tool-calling loops.
+logging.getLogger("google_genai.types").setLevel(logging.ERROR)
+
 from pyflow.models.runner import RunResult
 from pyflow.models.workflow import RuntimeConfig
 from pyflow.platform.plugins import resolve_plugins
 
 
+def _detect_system_timezone() -> str:
+    """Detect the local system IANA timezone name (e.g. 'America/Bogota').
+
+    Falls back to 'UTC' if detection fails.
+    """
+    import time
+
+    # time.tzname gives abbreviations like ('EST', 'EDT') — not usable with ZoneInfo.
+    # On macOS/Linux, /etc/localtime is a symlink into the zoneinfo database.
+    try:
+        from pathlib import Path
+
+        target = Path("/etc/localtime").resolve()
+        parts = target.parts
+        # e.g. /usr/share/zoneinfo/America/Bogota -> 'America/Bogota'
+        if "zoneinfo" in parts:
+            idx = parts.index("zoneinfo")
+            return "/".join(parts[idx + 1 :])
+    except (OSError, ValueError):
+        pass
+
+    # Windows: try tzlocal if available
+    try:
+        import tzlocal
+
+        return str(tzlocal.get_localzone())
+    except ImportError:
+        pass
+
+    # Last resort: check TZ env var
+    tz_env = time.tzname[0] if time.tzname else ""
+    try:
+        ZoneInfo(tz_env)
+        return tz_env
+    except (KeyError, Exception):
+        return "UTC"
+
+
 class WorkflowExecutor:
     """Configures and runs ADK Runner based on workflow RuntimeConfig."""
 
-    def __init__(self, app_name: str = "pyflow"):
+    def __init__(self, app_name: str = "pyflow", tz_name: str = ""):
         self._app_name = app_name
+        self._tz_name = tz_name or _detect_system_timezone()
+
+    def _datetime_state(self) -> dict[str, str]:
+        """Build session state with current date/time in the configured timezone."""
+        tz = ZoneInfo(self._tz_name)
+        now = datetime.now(tz)
+        return {
+            "current_date": now.strftime("%Y-%m-%d"),
+            "current_datetime": now.isoformat(),
+            "timezone": self._tz_name,
+        }
 
     def build_runner(self, agent: BaseAgent, runtime: RuntimeConfig) -> Runner:
         """Build a fully-configured ADK Runner from workflow runtime config."""
@@ -37,6 +94,7 @@ class WorkflowExecutor:
         session_id: str | None = None,
     ) -> RunResult:
         """Execute a workflow and collect results."""
+        state = self._datetime_state()
         if session_id:
             session = await runner.session_service.get_session(
                 app_name=self._app_name,
@@ -47,11 +105,13 @@ class WorkflowExecutor:
                 session = await runner.session_service.create_session(
                     app_name=self._app_name,
                     user_id=user_id,
+                    state=state,
                 )
         else:
             session = await runner.session_service.create_session(
                 app_name=self._app_name,
                 user_id=user_id,
+                state=state,
             )
 
         content = types.Content(
@@ -69,7 +129,7 @@ class WorkflowExecutor:
                 final_event = event
 
         if final_event and final_event.content and final_event.content.parts:
-            text = final_event.content.parts[0].text or ""
+            text = "".join(p.text for p in final_event.content.parts if p.text)
         else:
             text = ""
 
@@ -98,6 +158,7 @@ class WorkflowExecutor:
         session = await runner.session_service.create_session(
             app_name=self._app_name,
             user_id=user_id,
+            state=self._datetime_state(),
         )
         content = types.Content(
             role="user",

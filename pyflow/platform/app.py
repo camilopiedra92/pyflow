@@ -25,7 +25,7 @@ class PyFlowPlatform:
         self.config = config or PlatformConfig()
         self.tools = ToolRegistry()
         self.workflows = WorkflowRegistry()
-        self.executor = WorkflowExecutor()
+        self.executor = WorkflowExecutor(tz_name=self.config.timezone)
         self._a2a = AgentCardGenerator(base_url=f"http://{self.config.host}:{self.config.port}")
         self._booted = False
 
