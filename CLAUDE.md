@@ -6,7 +6,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 
 - `source .venv/bin/activate` — activate virtual environment (required before running anything)
 - `pip install -e ".[dev]"` — install with dev dependencies
-- `pytest -v` — run all 221 tests
+- `pytest -v` — run all 361 tests
 - `pyflow run <workflow_name>` — execute a workflow by name
 - `pyflow validate <workflow.yaml>` — validate YAML syntax against WorkflowDef schema
 - `pyflow list --tools` — list registered platform tools
@@ -45,6 +45,7 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - `pyflow/tools/alert.py` — AlertTool (webhook notifications)
 - `pyflow/tools/storage.py` — StorageTool (JSON file read/write/append)
 - `pyflow/models/workflow.py` — WorkflowDef, AgentConfig, OrchestrationConfig, A2AConfig
+- `pyflow/platform/agents/expr_agent.py` — ExprAgent: inline safe Python expressions (AST-validated sandbox)
 - `pyflow/models/agent.py` — AgentConfig (model, instruction, tools ref)
 - `pyflow/models/tool.py` — ToolMetadata
 - `pyflow/models/platform.py` — PlatformConfig
@@ -59,14 +60,15 @@ Agent platform powered by Google ADK. Workflows defined in YAML, auto-hydrated i
 - Tools inherit from `BasePlatformTool` and auto-register via `__init_subclass__` — no manual registration needed
 - Each tool defines `name`, `description` class vars + async `execute()` with typed parameters
 - `as_function_tool()` converts any platform tool to an ADK `FunctionTool`
-- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`), `orchestration`, and optional `a2a`
+- Workflows are YAML with `agents` (each with `name`, `type`, `model`, `instruction`, `tools`, `output_key`), `orchestration`, and optional `a2a`. Agent types: `llm`, `sequential`, `parallel`, `loop`, `code`, `tool`, `expr`
+- `expr` agents evaluate safe Python expressions inline (AST-validated, restricted builtins, no imports/IO) — reuses sandbox from ConditionTool
 - WorkflowHydrator resolves tool name references against ToolRegistry and creates ADK agent trees
 - Non-Gemini models (anthropic/, openai/) auto-wrapped with LiteLlm
 - A2A agent cards auto-generated from workflow definitions with skills metadata
 
 ## Testing
 
-- 221 tests across 20 test files
+- 361 tests across 23 test files
 - TDD: tests written before implementation for every module
 - HTTP tests use `pytest-httpx` mocks (no real network calls)
 - CLI tests use `typer.testing.CliRunner`
