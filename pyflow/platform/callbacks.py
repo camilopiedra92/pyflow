@@ -17,3 +17,14 @@ def resolve_callback(fqn: str | None) -> Callable | None:
     return getattr(module, obj_name)
 
 
+def resolve_tool_predicate(fqn: str) -> Callable:
+    """Resolve a FQN to a ToolPredicate callable.
+
+    Raises TypeError if the resolved object is not callable.
+    """
+    obj = resolve_callback(fqn)
+    if obj is None or not callable(obj):
+        raise TypeError(f"ToolPredicate FQN '{fqn}' did not resolve to a callable")
+    return obj
+
+

@@ -47,6 +47,7 @@ class TestOpenApiToolConfig:
         config = OpenApiToolConfig(spec="specs/petstore.yaml")
         assert config.spec == "specs/petstore.yaml"
         assert config.name_prefix is None
+        assert config.tool_filter is None
         assert config.auth.type == "none"
 
     def test_with_prefix_and_auth(self):
@@ -57,5 +58,23 @@ class TestOpenApiToolConfig:
         )
         assert config.name_prefix == "ynab"
         assert config.auth.type == "bearer"
+
+    def test_tool_filter_list(self):
+        config = OpenApiToolConfig(
+            spec="specs/petstore.yaml",
+            tool_filter=["getUsers", "createUser"],
+        )
+        assert config.tool_filter == ["getUsers", "createUser"]
+
+    def test_tool_filter_fqn_string(self):
+        config = OpenApiToolConfig(
+            spec="specs/petstore.yaml",
+            tool_filter="mypackage.filters.my_predicate",
+        )
+        assert config.tool_filter == "mypackage.filters.my_predicate"
+
+    def test_tool_filter_default_none(self):
+        config = OpenApiToolConfig(spec="specs/petstore.yaml")
+        assert config.tool_filter is None
 
 

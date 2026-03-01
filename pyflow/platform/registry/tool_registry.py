@@ -89,6 +89,15 @@ class ToolRegistry:
                 kwargs["auth_scheme"] = auth_scheme
             if auth_credential is not None:
                 kwargs["auth_credential"] = auth_credential
+            if cfg.name_prefix is not None:
+                kwargs["tool_name_prefix"] = cfg.name_prefix
+            if cfg.tool_filter is not None:
+                if isinstance(cfg.tool_filter, list):
+                    kwargs["tool_filter"] = cfg.tool_filter
+                else:
+                    from pyflow.platform.callbacks import resolve_tool_predicate
+
+                    kwargs["tool_filter"] = resolve_tool_predicate(cfg.tool_filter)
             self._openapi_tools[name] = OpenAPIToolset(**kwargs)
 
     def get(self, name: str) -> BasePlatformTool:
