@@ -90,7 +90,7 @@ class MyTool(BasePlatformTool):
 
     async def execute(self, tool_context, param1: str, param2: int = 0) -> dict:
         # ... implementation
-        return {"result": "done"}
+        return {"status": "success", "result": "done", "error": None}
 ```
 
 Tools can be used in two ways:
@@ -329,7 +329,7 @@ Make HTTP requests to external APIs. Includes SSRF protection that blocks reques
 | `timeout` | `int` | `30` | Request timeout in seconds (1-300) |
 | `allow_private` | `bool` | `False` | Allow requests to private network addresses |
 
-**Returns:** `{"status": int, "headers": dict, "body": str|dict}` or `{"status": 0, "error": str}` on failure.
+**Returns:** `{"status": "success", "status_code": int, "headers": dict, "body": str|dict, "error": null}` or `{"status": "error", "status_code": 0, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -365,7 +365,7 @@ Apply a JSONPath expression to extract or transform data from JSON input. Powere
 | `input_data` | `str` | *(required)* | JSON string to transform |
 | `expression` | `str` | *(required)* | JSONPath expression (e.g. `$.name`, `$.items[*].id`) |
 
-**Returns:** `{"result": value}` for single match, `{"result": [values]}` for multiple matches, `{"result": null}` for no matches, or `{"result": null, "error": str}` on failure.
+**Returns:** `{"status": "success", "result": value, "error": null}` for single match, `{"status": "success", "result": [values], "error": null}` for multiple matches, `{"status": "success", "result": null, "error": null}` for no matches, or `{"status": "error", "result": null, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -400,7 +400,7 @@ Evaluate a boolean expression safely within an AST-validated sandbox. Returns `t
 |-----------|------|---------|-------------|
 | `expression` | `str` | *(required)* | A Python boolean expression (e.g. `1 + 1 == 2`, `x > 5 and y < 10`) |
 
-**Returns:** `{"result": bool}` or `{"result": false, "error": str}` on failure.
+**Returns:** `{"status": "success", "result": bool, "error": null}` or `{"status": "error", "result": false, "error": str}` on failure.
 
 **Available builtins:** `abs`, `all`, `any`, `bool`, `float`, `int`, `len`, `max`, `min`, `round`, `sorted`, `str`, `sum`, `tuple`, `list`, `True`, `False`, `None`.
 
@@ -427,7 +427,7 @@ Send alert messages to a webhook URL via HTTP POST. Includes SSRF protection.
 | `webhook_url` | `str` | *(required)* | The webhook URL to POST the alert to |
 | `message` | `str` | *(required)* | The alert message to send |
 
-**Returns:** `{"status": int, "sent": bool, "error": str|null}`.
+**Returns:** `{"status": "success", "status_code": int, "sent": true, "error": null}` or `{"status": "error", "status_code": 0, "sent": false, "error": str}`.
 
 The alert is sent as `{"message": "your message"}` in the POST body.
 
@@ -466,7 +466,7 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 | `action` | `str` | `"read"` | One of `read`, `write`, `append` |
 | `data` | `str` | `""` | Data to write/append (JSON string for structured data, plain text otherwise) |
 
-**Returns:** `{"content": str|null, "success": bool}` or `{"content": null, "success": false, "error": str}` on failure.
+**Returns:** `{"status": "success", "content": str, "error": null}` or `{"status": "error", "content": null, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -550,6 +550,15 @@ Filtering happens at the agent level via `FilteredToolset`, a lightweight wrappe
 
 Without filtering (bare string), all operations from the spec are available (default). Operation names are snake_case versions of the `operationId` in the spec.
 
+**OpenAPI tool config fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec` | `str` | Path to OpenAPI spec file (relative to project root) |
+| `name_prefix` | `str \| null` | Optional prefix for generated tool names (→ ADK `tool_name_prefix`) |
+| `tool_filter` | `list[str] \| str \| null` | Optional project-level filter: list = whitelist of operation names, string = FQN predicate callable (→ ADK `tool_filter`) |
+| `auth` | `OpenApiAuthConfig` | Authentication config (see below) |
+
 **Auth types:**
 
 | Type | Fields | Description |
@@ -557,6 +566,7 @@ Without filtering (bare string), all operations from the spec are available (def
 | `bearer` | `token_env` | Bearer token from env var |
 | `apikey` | `token_env`, `apikey_location`, `apikey_name` | API key in header or query param |
 | `oauth2` | `authorization_url`, `token_url`, `scopes`, `client_id_env`, `client_secret_env` | OAuth 2.0 authorization code flow |
+| `service_account` | `service_account_env`, `service_account_scopes` | GCP service account JSON key from env var + OAuth scopes |
 | `none` *(default)* | — | No authentication |
 
 Each operation in the OpenAPI spec becomes a callable tool. The spec path is resolved relative to the project root (parent of the `agents/` directory).
@@ -600,7 +610,7 @@ Any Python callable can be referenced as a tool using its dotted module path. Th
 tools: [http_request, mypackage.tools.custom_search]
 ```
 
-Resolution order: custom platform tools > OpenAPI toolsets > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`.
+Resolution order: custom platform tools > OpenAPI toolsets > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`. A warning is emitted at resolution time if the function's first parameter is not `tool_context` (since ADK injects this automatically).
 
 ### Creating Custom Tools
 
@@ -637,8 +647,10 @@ class MyTool(BasePlatformTool):
             param2: Description of param2.
         """
         # ... implementation
-        return {"result": "done"}
+        return {"status": "success", "result": "done", "error": None}
 ```
+
+All platform tools return standardized dicts with `"status": "success"|"error"` and `"error": str|null` keys. For HTTP tools, use `"status_code"` for the HTTP code (not `"status"`).
 
 The tool is immediately available as `my_tool` in any workflow — no registration code needed. ADK's `FunctionTool` inspects the `execute()` signature to generate the tool schema for the LLM.
 
@@ -659,7 +671,7 @@ class MyApiTool(BasePlatformTool):
     async def execute(self, tool_context: ToolContext, query: str) -> dict:
         token = get_secret("my_api_token")  # reads PYFLOW_MY_API_TOKEN
         if not token:
-            return {"success": False, "error": "API token not configured"}
+            return {"status": "error", "error": "API token not configured"}
         # ... use token
 ```
 
