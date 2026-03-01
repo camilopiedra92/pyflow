@@ -114,6 +114,20 @@ class TestBuiltinToolCatalog:
         tools = registry.resolve_tools(["exit_loop"])
         assert len(tools) == 1
 
+    def test_exit_loop_returns_bare_callable(self) -> None:
+        """exit_loop should be returned as a bare callable, not wrapped in FunctionTool."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("exit_loop")
+        assert callable(tool)
+        assert not isinstance(tool, FunctionTool)
+
+    def test_transfer_to_agent_returns_bare_callable(self) -> None:
+        """transfer_to_agent should be returned as a bare callable, not wrapped in FunctionTool."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("transfer_to_agent")
+        assert callable(tool)
+        assert not isinstance(tool, FunctionTool)
+
     def test_custom_takes_priority_over_builtin(self) -> None:
         """Custom tools should resolve normally and take priority over built-in."""
         registry = ToolRegistry()

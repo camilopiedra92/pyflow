@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from google.adk.tools import FunctionTool
-from google.adk.tools.exit_loop_tool import exit_loop
 
 from pyflow.models.tool import ToolMetadata
 from pyflow.platform.openapi_auth import resolve_openapi_auth
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 # ADK built-in tools available by name in workflow YAML.
 # Most are pre-instantiated tool objects (not FunctionTool), returned directly via lazy import.
 _ADK_BUILTIN_TOOLS: dict[str, Callable] = {
-    "exit_loop": lambda: FunctionTool(func=exit_loop),
+    "exit_loop": lambda: _lazy_import_builtin("google.adk.tools", "exit_loop"),
     # Grounding tools (Gemini invokes automatically when listed in tools)
     "google_search": lambda: _lazy_import_builtin("google.adk.tools", "google_search"),
     "google_maps_grounding": lambda: _lazy_import_builtin("google.adk.tools", "google_maps_grounding"),
@@ -35,9 +34,7 @@ _ADK_BUILTIN_TOOLS: dict[str, Callable] = {
     # Interactive tools
     "get_user_choice": lambda: _lazy_import_builtin("google.adk.tools", "get_user_choice"),
     # Agent transfer (useful for llm_routed orchestration)
-    "transfer_to_agent": lambda: FunctionTool(
-        func=_lazy_import_builtin("google.adk.tools", "transfer_to_agent")
-    ),
+    "transfer_to_agent": lambda: _lazy_import_builtin("google.adk.tools", "transfer_to_agent"),
 }
 
 
@@ -100,7 +97,7 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
         return self._tools[name]()
 
-    def get_function_tool(self, name: str) -> FunctionTool | BaseTool:
+    def get_function_tool(self, name: str) -> FunctionTool | BaseTool | Callable:
         """Get an ADK FunctionTool by tool name.
 
         Resolution order: custom tools > ADK built-in tools > FQN import.
@@ -114,7 +111,7 @@ class ToolRegistry:
             return self._resolve_fqn_tool(name)
         raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
 
-    def get_tool_union(self, name: str) -> FunctionTool | BaseTool | BaseToolset:
+    def get_tool_union(self, name: str) -> FunctionTool | BaseTool | BaseToolset | Callable:
         """Resolve a tool name to an ADK-compatible tool (FunctionTool or BaseToolset).
 
         4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
@@ -141,7 +138,7 @@ class ToolRegistry:
 
     def resolve_tools(
         self, tool_refs: list[str | dict[str, list[str]]]
-    ) -> list[FunctionTool | BaseTool | BaseToolset]:
+    ) -> list[FunctionTool | BaseTool | BaseToolset | Callable]:
         """Batch resolve tool references to ADK tools (FunctionTool, BaseToolset, or FilteredToolset).
 
         Each ref is either a string (resolved via get_tool_union) or a dict
