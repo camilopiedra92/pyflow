@@ -239,6 +239,13 @@ class TestFQNToolResolution:
         tool = registry.get_function_tool("dummy_tool")
         assert isinstance(tool, FunctionTool)
 
+    def test_fqn_warns_on_missing_tool_context_param(self, capsys) -> None:
+        """FQN tool should warn if first param is not tool_context."""
+        registry = ToolRegistry()
+        registry.get_function_tool("json.dumps")
+        captured = capsys.readouterr()
+        assert "fqn_tool_missing_tool_context" in captured.out
+
 
 # -- OpenAPI tool registration tests ------------------------------------------
 

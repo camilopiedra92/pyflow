@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import structlog
 
 from google.adk.tools import FunctionTool
 
 from pyflow.models.tool import ToolMetadata
 from pyflow.platform.openapi_auth import resolve_openapi_auth
 from pyflow.tools.base import BasePlatformTool
+
+log = structlog.get_logger()
 
 if TYPE_CHECKING:
     from google.adk.tools import BaseTool
@@ -142,6 +147,18 @@ class ToolRegistry:
         module = importlib.import_module(module_path)
         obj = getattr(module, obj_name)
         if callable(obj):
+            try:
+                sig = inspect.signature(obj)
+                params = list(sig.parameters.keys())
+                if not params or params[0] != "tool_context":
+                    log.warning(
+                        "fqn_tool_missing_tool_context",
+                        fqn=fqn,
+                        first_param=params[0] if params else None,
+                        hint="ADK tools typically accept 'tool_context' as first parameter",
+                    )
+            except (ValueError, TypeError):
+                pass  # Some builtins don't support inspect.signature
             return FunctionTool(func=obj)
         raise KeyError(f"FQN '{fqn}' does not resolve to a callable.")
 
