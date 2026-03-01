@@ -50,5 +50,19 @@ def resolve_openapi_auth(auth):
                 ),
             )
             return auth_scheme, auth_credential
+        case "service_account":
+            import json as json_mod
+
+            from google.adk.tools.openapi_tool.auth.auth_helpers import (
+                service_account_dict_to_scheme_credential,
+            )
+
+            sa_json = os.environ.get(auth.service_account_env or "", "{}")
+            try:
+                sa_config = json_mod.loads(sa_json)
+            except json_mod.JSONDecodeError:
+                sa_config = {}
+            scopes = auth.service_account_scopes or []
+            return service_account_dict_to_scheme_credential(sa_config, scopes)
         case _:
             return None, None

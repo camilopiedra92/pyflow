@@ -41,6 +41,18 @@ class TestOpenApiAuthConfig:
         assert auth.type == "oauth2"
         assert auth.scopes == {"read": "Read access"}
 
+    def test_service_account(self):
+        auth = OpenApiAuthConfig(
+            type="service_account",
+            service_account_env="PYFLOW_SA_KEY",
+            service_account_scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        assert auth.type == "service_account"
+        assert auth.service_account_env == "PYFLOW_SA_KEY"
+        assert auth.service_account_scopes == [
+            "https://www.googleapis.com/auth/spreadsheets"
+        ]
+
 
 class TestOpenApiToolConfig:
     def test_basic_spec(self):

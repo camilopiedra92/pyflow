@@ -59,3 +59,30 @@ class TestResolveOpenApiAuthOAuth2:
             scheme, credential = resolve_openapi_auth(auth)
         assert scheme is not None
         assert credential is not None
+
+
+class TestResolveOpenApiAuthServiceAccount:
+    def test_service_account_returns_scheme_and_credential(self):
+        import json
+
+        sa_key = json.dumps({"type": "service_account", "project_id": "test"})
+        auth = OpenApiAuthConfig(
+            type="service_account",
+            service_account_env="TEST_SA_KEY",
+            service_account_scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        with patch.dict(os.environ, {"TEST_SA_KEY": sa_key}):
+            scheme, credential = resolve_openapi_auth(auth)
+        assert scheme is not None
+        assert credential is not None
+
+    def test_service_account_missing_env_returns_empty_config(self):
+        auth = OpenApiAuthConfig(
+            type="service_account",
+            service_account_env="MISSING_SA_KEY",
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            scheme, credential = resolve_openapi_auth(auth)
+        # Should still return non-None (empty SA config is handled gracefully)
+        assert scheme is not None
+        assert credential is not None

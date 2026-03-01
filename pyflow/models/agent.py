@@ -8,7 +8,7 @@ from pydantic import BaseModel, model_validator
 class OpenApiAuthConfig(BaseModel):
     """Authentication configuration for OpenAPI toolsets."""
 
-    type: Literal["none", "bearer", "apikey", "oauth2"] = "none"
+    type: Literal["none", "bearer", "apikey", "oauth2", "service_account"] = "none"
     # bearer: env var containing the token
     token_env: str | None = None
     # apikey
@@ -20,6 +20,9 @@ class OpenApiAuthConfig(BaseModel):
     scopes: dict[str, str] | None = None
     client_id_env: str | None = None
     client_secret_env: str | None = None
+    # service_account: GCP service account JSON key
+    service_account_env: str | None = None
+    service_account_scopes: list[str] | None = None
 
 
 class OpenApiToolConfig(BaseModel):
