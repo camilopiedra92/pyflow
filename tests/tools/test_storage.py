@@ -18,8 +18,9 @@ class TestStorageToolExecute:
             action="write",
             data="hello world",
         )
-        assert write_result["success"] is True
+        assert write_result["status"] == "success"
         assert write_result["content"] == "hello world"
+        assert write_result["error"] is None
 
         # Read
         read_result = await tool.execute(
@@ -27,7 +28,7 @@ class TestStorageToolExecute:
             path=filepath,
             action="read",
         )
-        assert read_result["success"] is True
+        assert read_result["status"] == "success"
         assert read_result["content"] == "hello world"
 
     async def test_append(self, tmp_path):
@@ -48,7 +49,7 @@ class TestStorageToolExecute:
         filepath = str(tmp_path / "nonexistent.txt")
 
         result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
-        assert result["success"] is False
+        assert result["status"] == "error"
         assert result["content"] is None
         assert result["error"] == "File not found"
 
@@ -59,7 +60,7 @@ class TestStorageToolExecute:
         result = await tool.execute(
             tool_context=MagicMock(), path=filepath, action="write", data="nested"
         )
-        assert result["success"] is True
+        assert result["status"] == "success"
 
         read_result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
         assert read_result["content"] == "nested"
@@ -72,10 +73,10 @@ class TestStorageToolExecute:
         result = await tool.execute(
             tool_context=MagicMock(), path=filepath, action="write", data=data_str
         )
-        assert result["success"] is True
+        assert result["status"] == "success"
 
         read_result = await tool.execute(tool_context=MagicMock(), path=filepath, action="read")
-        assert read_result["success"] is True
+        assert read_result["status"] == "success"
         parsed = json.loads(read_result["content"])
         assert parsed == {"key": "value"}
 
@@ -84,7 +85,7 @@ class TestStorageToolExecute:
         filepath = str(tmp_path / "test.txt")
 
         result = await tool.execute(tool_context=MagicMock(), path=filepath, action="delete")
-        assert result["success"] is False
+        assert result["status"] == "error"
         assert "Unknown action" in result["error"]
 
     def test_auto_registered(self):

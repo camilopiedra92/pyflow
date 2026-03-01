@@ -30,8 +30,10 @@ class TestHttpToolExecute:
             )
 
         assert isinstance(result, dict)
-        assert result["status"] == 200
+        assert result["status"] == "success"
+        assert result["status_code"] == 200
         assert result["body"] == {"data": "test"}
+        assert result["error"] is None
         mock_client.request.assert_called_once_with(
             method="GET",
             url="https://example.com/api",
@@ -65,7 +67,8 @@ class TestHttpToolExecute:
                 body=body_json,
             )
 
-        assert result["status"] == 201
+        assert result["status"] == "success"
+        assert result["status_code"] == 201
         assert result["body"] == {"created": True}
         mock_client.request.assert_called_once_with(
             method="POST",
@@ -80,7 +83,8 @@ class TestHttpToolExecute:
             tool_context=MagicMock(),
             url="http://169.254.169.254/latest/meta-data/",
         )
-        assert result["status"] == 0
+        assert result["status"] == "error"
+        assert result["status_code"] == 0
         assert "SSRF blocked" in result["error"]
 
     async def test_ssrf_allowed_with_flag(self):
@@ -104,7 +108,8 @@ class TestHttpToolExecute:
                 allow_private=True,
             )
 
-        assert result["status"] == 200
+        assert result["status"] == "success"
+        assert result["status_code"] == 200
         assert result["body"] == {"local": True}
 
     async def test_network_error(self):
@@ -121,7 +126,8 @@ class TestHttpToolExecute:
                 url="https://example.com/fail",
             )
 
-        assert result["status"] == 0
+        assert result["status"] == "error"
+        assert result["status_code"] == 0
         assert "connection failed" in result["error"]
 
     async def test_invalid_json_headers_gracefully_handled(self):
@@ -146,7 +152,8 @@ class TestHttpToolExecute:
                 headers="not valid json{{{",
             )
 
-        assert result["status"] == 200
+        assert result["status"] == "success"
+        assert result["status_code"] == 200
         # Invalid JSON headers should fall back to empty dict
         mock_client.request.assert_called_once()
         call_kwargs = mock_client.request.call_args[1]

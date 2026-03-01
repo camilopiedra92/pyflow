@@ -27,7 +27,8 @@ class TestAlertToolExecute:
             )
 
         assert isinstance(result, dict)
-        assert result["status"] == 200
+        assert result["status"] == "success"
+        assert result["status_code"] == 200
         assert result["sent"] is True
         assert result["error"] is None
         mock_client.post.assert_called_once_with(
@@ -42,7 +43,8 @@ class TestAlertToolExecute:
             webhook_url="http://169.254.169.254/latest/",
             message="test",
         )
-        assert result["status"] == 0
+        assert result["status"] == "error"
+        assert result["status_code"] == 0
         assert result["sent"] is False
         assert "SSRF blocked" in result["error"]
 
@@ -53,6 +55,7 @@ class TestAlertToolExecute:
             webhook_url="http://localhost:8080/webhook",
             message="test",
         )
+        assert result["status"] == "error"
         assert result["sent"] is False
         assert "SSRF blocked" in result["error"]
 
@@ -71,8 +74,9 @@ class TestAlertToolExecute:
                 message="test",
             )
 
+        assert result["status"] == "error"
         assert result["sent"] is False
-        assert result["status"] == 0
+        assert result["status_code"] == 0
         assert "timeout" in result["error"]
 
     async def test_server_error_status(self):
@@ -93,7 +97,8 @@ class TestAlertToolExecute:
                 message="test",
             )
 
-        assert result["status"] == 500
+        assert result["status"] == "success"
+        assert result["status_code"] == 500
         assert result["sent"] is True  # sent but server returned error
 
     def test_auto_registered(self):

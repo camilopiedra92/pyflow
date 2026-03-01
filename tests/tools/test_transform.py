@@ -15,6 +15,7 @@ class TestTransformToolExecute:
             expression="$.name",
         )
         assert isinstance(result, dict)
+        assert result["status"] == "success"
         assert result["result"] == "pyflow"
 
     async def test_array_indexing(self):
@@ -51,8 +52,9 @@ class TestTransformToolExecute:
             input_data=json.dumps({"a": 1}),
             expression="$.nonexistent",
         )
+        assert result["status"] == "success"
         assert result["result"] is None
-        assert "error" not in result
+        assert result["error"] is None
 
     async def test_invalid_expression_returns_error(self):
         tool = TransformTool()
@@ -61,8 +63,8 @@ class TestTransformToolExecute:
             input_data=json.dumps({"a": 1}),
             expression="not a valid jsonpath [[[",
         )
+        assert result["status"] == "error"
         assert result["result"] is None
-        assert "error" in result
         assert "JSONPath error" in result["error"]
 
     async def test_invalid_json_input_returns_error(self):
@@ -72,6 +74,7 @@ class TestTransformToolExecute:
             input_data="not valid json{{{",
             expression="$.name",
         )
+        assert result["status"] == "error"
         assert result["result"] is None
         assert result["error"] == "Invalid JSON input"
 

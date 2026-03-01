@@ -105,12 +105,12 @@ class ConditionTool(BasePlatformTool):
         try:
             _validate_ast(expression)
         except (ValueError, SyntaxError) as exc:
-            return {"result": False, "error": str(exc)}
+            return {"status": "error", "result": False, "error": str(exc)}
 
         try:
             # Security: AST validation above is the actual security boundary,
             # not the restricted builtins alone.
             result = bool(eval(expression, {"__builtins__": _SAFE_BUILTINS}))  # noqa: S307
-            return {"result": result}
+            return {"status": "success", "result": result, "error": None}
         except Exception as exc:
-            return {"result": False, "error": f"Evaluation error: {exc}"}
+            return {"status": "error", "result": False, "error": f"Evaluation error: {exc}"}
