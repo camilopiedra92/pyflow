@@ -28,7 +28,6 @@ class OpenApiToolConfig(BaseModel):
     spec: str
     name_prefix: str | None = None
     auth: OpenApiAuthConfig = OpenApiAuthConfig()
-    tool_filter: list[str] | str | None = None
 
 
 class AgentConfig(BaseModel):
@@ -38,7 +37,7 @@ class AgentConfig(BaseModel):
     type: Literal["llm", "sequential", "parallel", "loop", "code", "tool", "expr"]
     model: str | None = None
     instruction: str | None = None
-    tools: list[str] = []
+    tools: list[str | dict[str, list[str]]] = []
     output_key: str | None = None
     sub_agents: list[str] | None = None
     callbacks: dict[str, str] | None = None

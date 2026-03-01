@@ -383,13 +383,13 @@ class TestBudgetAnalystYaml:
     """Validate workflow.yaml structure and constraints."""
 
     def test_openapi_tools_from_project_config(self):
-        """openapi_tools is defined in pyflow.yaml, not in workflow YAML."""
+        """openapi_tools is defined in pyflow.yaml (infrastructure), filtering in workflow YAML."""
         import yaml
 
         from pyflow.models.project import ProjectConfig
         from pyflow.models.workflow import WorkflowDef
 
-        # pyflow.yaml at project root defines the tool
+        # pyflow.yaml at project root defines the tool (no tool_filter)
         config = ProjectConfig.from_yaml(Path("pyflow.yaml"))
         assert "ynab" in config.openapi_tools
         assert config.openapi_tools["ynab"].spec == "specs/ynab-v1-openapi.yaml"
@@ -401,9 +401,9 @@ class TestBudgetAnalystYaml:
         raw = yaml.safe_load(wf_path.read_text())
         assert "openapi_tools" not in raw
 
-        # Agent still references ynab by name
+        # Agent references ynab with glob filter
         wf = WorkflowDef.from_yaml(wf_path)
-        assert "ynab" in wf.agents[0].tools
+        assert wf.agents[0].tools == [{"ynab": ["get*"]}]
 
     def test_agent_config(self):
         from pyflow.models.workflow import WorkflowDef
@@ -414,6 +414,7 @@ class TestBudgetAnalystYaml:
         assert agent.model == "gemini-2.5-flash"
         assert agent.temperature == 0.2
         assert agent.max_output_tokens == 4096
+        assert agent.tools == [{"ynab": ["get*"]}]
         assert agent.output_key == "analysis"
         assert "milliunits" in (agent.instruction or "")
 
@@ -437,9 +438,8 @@ class TestBudgetAnalystHydration:
     async def test_hydrated_agent_has_openapi_toolset(self):
         from google.adk.agents.llm_agent import LlmAgent
         from google.adk.planners.plan_re_act_planner import PlanReActPlanner
-        from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import (
-            OpenAPIToolset,
-        )
+
+        from pyflow.platform.filtered_toolset import FilteredToolset
 
         config = PlatformConfig(workflows_dir="agents", load_dotenv=False)
         platform = PyFlowPlatform(config)
@@ -449,6 +449,6 @@ class TestBudgetAnalystHydration:
         assert isinstance(agent, LlmAgent)
         assert isinstance(agent.planner, PlanReActPlanner)
         assert len(agent.tools) == 1
-        assert isinstance(agent.tools[0], OpenAPIToolset)
+        assert isinstance(agent.tools[0], FilteredToolset)
         assert "ynab" in platform.tools
         await platform.shutdown()

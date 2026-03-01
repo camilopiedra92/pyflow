@@ -58,26 +58,4 @@ class TestOpenApiToolConfig:
         assert config.name_prefix == "ynab"
         assert config.auth.type == "bearer"
 
-    def test_tool_filter_default_none(self):
-        config = OpenApiToolConfig(spec="specs/petstore.yaml")
-        assert config.tool_filter is None
-
-    def test_tool_filter_list(self):
-        config = OpenApiToolConfig(
-            spec="specs/petstore.yaml",
-            tool_filter=["get_pets", "create_pet", "get_pet_by_id"],
-        )
-        assert config.tool_filter == ["get_pets", "create_pet", "get_pet_by_id"]
-
-    def test_tool_filter_empty_list(self):
-        config = OpenApiToolConfig(spec="specs/petstore.yaml", tool_filter=[])
-        assert config.tool_filter == []
-
-    def test_tool_filter_fqn_string(self):
-        config = OpenApiToolConfig(
-            spec="specs/petstore.yaml",
-            tool_filter="mypackage.predicates.budget_read_only",
-        )
-        assert config.tool_filter == "mypackage.predicates.budget_read_only"
-
 

@@ -511,53 +511,44 @@ openapi_tools:
 
 ```yaml
 agents:
-  - name: analyst
+  # All operations from the spec
+  - name: editor
     type: llm
     model: gemini-2.5-flash
     instruction: "Help the user manage their budget"
     tools: [ynab]
     output_key: budget_info
+
+  # Filtered: only GET operations (per-agent glob patterns)
+  - name: analyst
+    type: llm
+    model: gemini-2.5-flash
+    instruction: "Answer questions about the user's budget"
+    tools:
+      - ynab: ["get*"]
+    output_key: analysis
 ```
 
 The agent doesn't know it's backed by an OpenAPI spec — it just uses `ynab` like any other tool name. The `ToolRegistry` handles the 4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
 
-**Filtering operations:** Large OpenAPI specs can expose dozens of operations. Use `tool_filter` to limit which operations your agent sees — reduces token usage by limiting the tool schemas sent to the LLM.
+**Filtering operations:** Large OpenAPI specs can expose dozens of operations. Use per-agent glob patterns to limit which operations an agent sees — reduces token usage by limiting the tool schemas sent to the LLM.
 
-**Static list** — whitelist specific operation names:
+The `tools` list accepts two formats:
 
-```yaml
-openapi_tools:
-  ynab:
-    spec: specs/ynab-v1-openapi.yaml
-    auth:
-      type: bearer
-      token_env: PYFLOW_YNAB_API_TOKEN
-    tool_filter:
-      - get_budgets
-      - get_categories
-      - get_transactions_by_month
-```
-
-**Dynamic predicate** — Python FQN resolving to a `ToolPredicate` callable `(tool, readonly_context) -> bool`:
+- **String** — `ynab` — all operations from the spec (no filtering)
+- **Dict with glob patterns** — `{ynab: ["get*"]}` — only operations matching any pattern (uses `fnmatch`)
 
 ```yaml
-openapi_tools:
-  ynab:
-    spec: specs/ynab-v1-openapi.yaml
-    auth:
-      type: bearer
-      token_env: PYFLOW_YNAB_API_TOKEN
-    tool_filter: mypackage.predicates.budget_read_only
+tools:
+  - http_request                  # string: normal platform tool
+  - ynab                          # string: OpenAPI, all operations
+  - ynab: ["get*"]               # dict: OpenAPI with glob filter (GET only)
+  - stripe: ["list*", "get*"]    # dict: multiple glob patterns
 ```
 
-```python
-# mypackage/predicates.py
-def budget_read_only(tool, readonly_context):
-    """Only expose GET operations."""
-    return tool.name.startswith("get_")
-```
+Filtering happens at the agent level via `FilteredToolset`, a lightweight wrapper around the shared `OpenAPIToolset`. The spec is parsed once at boot; per-agent wrappers are cheap. Different agents in the same workflow can use different subsets of the same API.
 
-Without `tool_filter`, all operations from the spec are available (default). Operation names are snake_case versions of the `operationId` in the spec. FQN predicates are resolved at boot via `importlib` — bad FQNs fail fast with `ModuleNotFoundError` or `TypeError`.
+Without filtering (bare string), all operations from the spec are available (default). Operation names are snake_case versions of the `operationId` in the spec.
 
 **Auth types:**
 
@@ -1101,7 +1092,7 @@ agents:                              # required, list of agent configs
     # LLM fields:
     model: gemini-2.5-flash
     instruction: "What the LLM should do"
-    tools: [http_request, condition]
+    tools: [http_request, condition]    # strings or dicts: [{ynab: ["get*"]}]
     description: "Agent purpose for routing"  # optional
     include_contents: default        # default | none
     output_schema:                   # optional, JSON Schema -> enforces structured output

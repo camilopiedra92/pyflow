@@ -588,10 +588,10 @@ orchestration:
 
 A single LLM agent that autonomously decides which tool calls to make. Uses PlanReAct for structured multi-step reasoning.
 
-OpenAPI tools are defined in `pyflow.yaml` at the project root, not in the workflow YAML. Agents just reference them by name via `tools: [ynab]`.
+OpenAPI tools are defined in `pyflow.yaml` at the project root (infrastructure: spec + auth), not in the workflow YAML. Agents reference them by name, with optional per-agent glob filtering.
 
 ```yaml
-# pyflow.yaml (project root) — defines the tool
+# pyflow.yaml (project root) — defines the tool (infrastructure only)
 openapi_tools:
   ynab:
     spec: specs/ynab-v1-openapi.yaml
@@ -601,7 +601,7 @@ openapi_tools:
 ```
 
 ```yaml
-# agents/budget_analyst/workflow.yaml — uses the tool by name
+# agents/budget_analyst/workflow.yaml — uses the tool with per-agent filtering
 name: budget_analyst
 description: "Answer questions about your YNAB budget"
 
@@ -613,7 +613,8 @@ agents:
       You are a budget analyst.
       Start by calling list_budgets, then query as needed.
       NEVER call list_transactions without since_date.
-    tools: [ynab]
+    tools:
+      - ynab: ["get*"]        # only GET operations (glob filter)
     output_key: analysis
 
 orchestration:
@@ -629,6 +630,8 @@ a2a:
       description: "Analyze YNAB budget data"
       tags: [finance, budget]
 ```
+
+**Tool filtering syntax:** `tools: [ynab]` gives all operations; `tools: [{ynab: ["get*"]}]` filters with `fnmatch` glob patterns. Different agents can use different subsets of the same API — filtering is per-agent, not per-spec.
 
 **Key lesson:** For APIs that return large responses, always instruct the agent to filter (e.g. `since_date`). PlanReAct plans filters before executing, saving tokens vs vanilla ReAct which fetches first.
 

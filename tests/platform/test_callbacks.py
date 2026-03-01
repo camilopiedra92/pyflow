@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pyflow.platform.callbacks import resolve_callback, resolve_tool_predicate
+from pyflow.platform.callbacks import resolve_callback
 
 
 class TestFQNCallbackResolution:
@@ -37,20 +37,3 @@ class TestFQNCallbackResolution:
             resolve_callback("json.nonexistent_function")
 
 
-class TestToolPredicateResolution:
-    def test_resolve_callable(self):
-        """FQN for a callable should resolve successfully."""
-        import json
-
-        result = resolve_tool_predicate("json.dumps")
-        assert result is json.dumps
-
-    def test_non_callable_raises_type_error(self):
-        """FQN pointing to a non-callable should raise TypeError."""
-        with pytest.raises(TypeError, match="tool_filter 'os.sep' is not callable"):
-            resolve_tool_predicate("os.sep")
-
-    def test_bad_module_raises(self):
-        """FQN with non-existent module should raise ModuleNotFoundError."""
-        with pytest.raises(ModuleNotFoundError):
-            resolve_tool_predicate("nonexistent_module.func")

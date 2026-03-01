@@ -9,7 +9,6 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.exit_loop_tool import exit_loop
 
 from pyflow.models.tool import ToolMetadata
-from pyflow.platform.callbacks import resolve_tool_predicate
 from pyflow.platform.openapi_auth import resolve_openapi_auth
 from pyflow.tools.base import BasePlatformTool
 
@@ -91,11 +90,6 @@ class ToolRegistry:
                 kwargs["auth_scheme"] = auth_scheme
             if auth_credential is not None:
                 kwargs["auth_credential"] = auth_credential
-            if cfg.tool_filter is not None:
-                if isinstance(cfg.tool_filter, list):
-                    kwargs["tool_filter"] = cfg.tool_filter
-                else:
-                    kwargs["tool_filter"] = resolve_tool_predicate(cfg.tool_filter)
             self._openapi_tools[name] = OpenAPIToolset(**kwargs)
 
     def get(self, name: str) -> BasePlatformTool:
@@ -143,9 +137,28 @@ class ToolRegistry:
             return FunctionTool(func=obj)
         raise KeyError(f"FQN '{fqn}' does not resolve to a callable.")
 
-    def resolve_tools(self, names: list[str]) -> list:
-        """Batch resolve tool names to ADK tools (FunctionTool or BaseToolset)."""
-        return [self.get_tool_union(n) for n in names]
+    def resolve_tools(self, tool_refs: list[str | dict[str, list[str]]]) -> list:
+        """Batch resolve tool references to ADK tools (FunctionTool, BaseToolset, or FilteredToolset).
+
+        Each ref is either a string (resolved via get_tool_union) or a dict
+        like ``{"ynab": ["get*"]}`` which wraps the named OpenAPI toolset
+        in a FilteredToolset with fnmatch glob patterns.
+        """
+        from pyflow.platform.filtered_toolset import FilteredToolset
+
+        result = []
+        for ref in tool_refs:
+            if isinstance(ref, str):
+                result.append(self.get_tool_union(ref))
+            elif isinstance(ref, dict):
+                name, patterns = next(iter(ref.items()))
+                if name not in self._openapi_tools:
+                    raise KeyError(
+                        f"Filtered tool '{name}' is not a registered OpenAPI tool. "
+                        f"Available: {self.all_tool_names()}"
+                    )
+                result.append(FilteredToolset(self._openapi_tools[name], patterns))
+        return result
 
     def all_tool_names(self) -> list[str]:
         """Return all registered tool names (custom + OpenAPI)."""

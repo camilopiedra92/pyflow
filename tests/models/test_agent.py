@@ -388,6 +388,29 @@ class TestAgentConfigAgentTools:
         assert agent.agent_tools == ["summarizer", "translator"]
 
 
+class TestAgentConfigMixedTools:
+    def test_tools_accepts_mixed_strings_and_dicts(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            tools=["http_request", {"ynab": ["get*"]}],
+        )
+        assert agent.tools == ["http_request", {"ynab": ["get*"]}]
+
+    def test_tools_dict_with_glob_patterns(self):
+        agent = AgentConfig(
+            name="test",
+            type="llm",
+            model="gemini-2.5-flash",
+            instruction="Do stuff",
+            tools=[{"stripe": ["list*", "get*"]}, {"ynab": ["get_budgets"]}],
+        )
+        assert agent.tools[0] == {"stripe": ["list*", "get*"]}
+        assert agent.tools[1] == {"ynab": ["get_budgets"]}
+
+
 class TestAgentConfigInvalidType:
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):

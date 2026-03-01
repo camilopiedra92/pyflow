@@ -4,4 +4,3 @@ openapi_tools:
     auth:
       type: bearer
       token_env: PYFLOW_YNAB_API_TOKEN
-    tool_filter: agents.budget_analyst.predicates.read_only

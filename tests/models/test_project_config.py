@@ -19,7 +19,6 @@ openapi_tools:
     auth:
       type: bearer
       token_env: PYFLOW_YNAB_API_TOKEN
-    tool_filter: agents.budget_analyst.predicates.read_only
 """
         yaml_file = tmp_path / "pyflow.yaml"
         yaml_file.write_text(yaml_content)
@@ -30,7 +29,6 @@ openapi_tools:
         assert config.openapi_tools["ynab"].spec == "specs/ynab-v1-openapi.yaml"
         assert config.openapi_tools["ynab"].auth.type == "bearer"
         assert config.openapi_tools["ynab"].auth.token_env == "PYFLOW_YNAB_API_TOKEN"
-        assert config.openapi_tools["ynab"].tool_filter == "agents.budget_analyst.predicates.read_only"
 
     def test_returns_empty_when_file_missing(self, tmp_path):
         config = ProjectConfig.from_yaml(tmp_path / "nonexistent.yaml")

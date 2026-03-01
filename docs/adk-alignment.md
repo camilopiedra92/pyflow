@@ -45,7 +45,7 @@ ADK tools are also available by name (`exit_loop`, `google_search`, `transfer_to
 | `AgentTool` | Agent-as-tool composition via `agent_tools` YAML field |
 | Plugins (7 registered) | `logging`, `debug_logging`, `reflect_and_retry`, `context_filter`, `save_files_as_artifacts`, `multimodal_tool_results`, `bigquery_analytics` |
 | `McpToolset` | MCP server connections configurable via `mcp_servers` in workflow YAML |
-| `OpenAPIToolset` | OpenAPI spec → auto-generated tools via `openapi_tools` in `pyflow.yaml` (project-level, pre-built by ToolRegistry at boot, agents reference by name) |
+| `OpenAPIToolset` | OpenAPI spec → auto-generated tools via `openapi_tools` in `pyflow.yaml` (project-level, pre-built by ToolRegistry at boot); agents reference by name `tools: [ynab]` or with per-agent glob filter `tools: [{ynab: ["get*"]}]` via `FilteredToolset` wrapper |
 | Planners | `PlanReActPlanner`, `BuiltInPlanner` for react orchestration |
 | Callbacks (FQN) | `before_agent`, `before_model`, etc. resolved via Python FQN |
 | OpenTelemetry | Opt-in distributed tracing via `telemetry_enabled`/`telemetry_export` in PlatformConfig |
