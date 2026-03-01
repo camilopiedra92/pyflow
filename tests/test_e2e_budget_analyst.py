@@ -401,9 +401,9 @@ class TestBudgetAnalystYaml:
         raw = yaml.safe_load(wf_path.read_text())
         assert "openapi_tools" not in raw
 
-        # Agent references ynab with glob filter
+        # Agent references ynab by name (full toolset, no filter)
         wf = WorkflowDef.from_yaml(wf_path)
-        assert wf.agents[0].tools == [{"ynab": ["get*"]}]
+        assert "ynab" in wf.agents[0].tools
 
     def test_agent_config(self):
         from pyflow.models.workflow import WorkflowDef
@@ -414,7 +414,7 @@ class TestBudgetAnalystYaml:
         assert agent.model == "gemini-2.5-flash"
         assert agent.temperature == 0.2
         assert agent.max_output_tokens == 4096
-        assert agent.tools == [{"ynab": ["get*"]}]
+        assert agent.tools == ["ynab"]
         assert agent.output_key == "analysis"
         assert "milliunits" in (agent.instruction or "")
 
@@ -438,8 +438,9 @@ class TestBudgetAnalystHydration:
     async def test_hydrated_agent_has_openapi_toolset(self):
         from google.adk.agents.llm_agent import LlmAgent
         from google.adk.planners.plan_re_act_planner import PlanReActPlanner
-
-        from pyflow.platform.filtered_toolset import FilteredToolset
+        from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import (
+            OpenAPIToolset,
+        )
 
         config = PlatformConfig(workflows_dir="agents", load_dotenv=False)
         platform = PyFlowPlatform(config)
@@ -449,6 +450,6 @@ class TestBudgetAnalystHydration:
         assert isinstance(agent, LlmAgent)
         assert isinstance(agent.planner, PlanReActPlanner)
         assert len(agent.tools) == 1
-        assert isinstance(agent.tools[0], FilteredToolset)
+        assert isinstance(agent.tools[0], OpenAPIToolset)
         assert "ynab" in platform.tools
         await platform.shutdown()
