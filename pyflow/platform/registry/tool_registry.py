@@ -13,6 +13,8 @@ from pyflow.platform.openapi_auth import resolve_openapi_auth
 from pyflow.tools.base import BasePlatformTool
 
 if TYPE_CHECKING:
+    from google.adk.tools import BaseTool
+    from google.adk.tools.base_toolset import BaseToolset
     from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
     from pyflow.models.agent import OpenApiToolConfig
@@ -98,7 +100,7 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
         return self._tools[name]()
 
-    def get_function_tool(self, name: str) -> FunctionTool:
+    def get_function_tool(self, name: str) -> FunctionTool | BaseTool:
         """Get an ADK FunctionTool by tool name.
 
         Resolution order: custom tools > ADK built-in tools > FQN import.
@@ -112,7 +114,7 @@ class ToolRegistry:
             return self._resolve_fqn_tool(name)
         raise KeyError(f"Unknown tool: '{name}'. Available: {list(self._tools.keys())}")
 
-    def get_tool_union(self, name: str):
+    def get_tool_union(self, name: str) -> FunctionTool | BaseTool | BaseToolset:
         """Resolve a tool name to an ADK-compatible tool (FunctionTool or BaseToolset).
 
         4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
@@ -137,7 +139,9 @@ class ToolRegistry:
             return FunctionTool(func=obj)
         raise KeyError(f"FQN '{fqn}' does not resolve to a callable.")
 
-    def resolve_tools(self, tool_refs: list[str | dict[str, list[str]]]) -> list:
+    def resolve_tools(
+        self, tool_refs: list[str | dict[str, list[str]]]
+    ) -> list[FunctionTool | BaseTool | BaseToolset]:
         """Batch resolve tool references to ADK tools (FunctionTool, BaseToolset, or FilteredToolset).
 
         Each ref is either a string (resolved via get_tool_union) or a dict
