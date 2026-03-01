@@ -35,3 +35,5 @@ class TestFQNCallbackResolution:
         """FQN with non-existent attribute should raise AttributeError."""
         with pytest.raises(AttributeError):
             resolve_callback("json.nonexistent_function")
+
+

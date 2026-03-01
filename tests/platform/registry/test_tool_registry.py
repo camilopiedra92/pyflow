@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from typing import Any, ClassVar
+from unittest.mock import MagicMock, patch
 
 import pytest
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
+from pyflow.models.agent import OpenApiToolConfig
 from pyflow.models.tool import ToolMetadata
 from pyflow.platform.registry.tool_registry import ToolRegistry
 from pyflow.tools.base import BasePlatformTool
@@ -111,6 +113,20 @@ class TestBuiltinToolCatalog:
         registry.discover()
         tools = registry.resolve_tools(["exit_loop"])
         assert len(tools) == 1
+
+    def test_exit_loop_returns_bare_callable(self) -> None:
+        """exit_loop should be returned as a bare callable, not wrapped in FunctionTool."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("exit_loop")
+        assert callable(tool)
+        assert not isinstance(tool, FunctionTool)
+
+    def test_transfer_to_agent_returns_bare_callable(self) -> None:
+        """transfer_to_agent should be returned as a bare callable, not wrapped in FunctionTool."""
+        registry = ToolRegistry()
+        tool = registry.get_function_tool("transfer_to_agent")
+        assert callable(tool)
+        assert not isinstance(tool, FunctionTool)
 
     def test_custom_takes_priority_over_builtin(self) -> None:
         """Custom tools should resolve normally and take priority over built-in."""
@@ -222,3 +238,308 @@ class TestFQNToolResolution:
         registry.register(_DummyTool)
         tool = registry.get_function_tool("dummy_tool")
         assert isinstance(tool, FunctionTool)
+
+    def test_fqn_warns_on_missing_tool_context_param(self, capsys) -> None:
+        """FQN tool should warn if first param is not tool_context."""
+        registry = ToolRegistry()
+        registry.get_function_tool("json.dumps")
+        captured = capsys.readouterr()
+        assert "fqn_tool_missing_tool_context" in captured.out
+
+
+# -- OpenAPI tool registration tests ------------------------------------------
+
+
+class TestOpenApiToolRegistration:
+    def test_register_openapi_tools(self, tmp_path) -> None:
+        """register_openapi_tools() stores toolset instances keyed by name."""
+        spec_file = tmp_path / "specs" / "test.yaml"
+        spec_file.parent.mkdir(parents=True)
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {"myapi": OpenApiToolConfig(spec="specs/test.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        assert "myapi" in registry
+        MockToolset.assert_called_once()
+
+    def test_len_includes_openapi(self, tmp_path) -> None:
+        """__len__ includes both custom and OpenAPI tools."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        configs = {"api1": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        assert len(registry) == 2  # dummy_tool + api1
+
+    def test_contains_openapi(self, tmp_path) -> None:
+        """__contains__ finds OpenAPI tools."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        assert "ynab" in registry
+        assert "nonexistent" not in registry
+
+    def test_all_tool_names(self, tmp_path) -> None:
+        """all_tool_names() returns merged sorted list."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        names = registry.all_tool_names()
+        assert "dummy_tool" in names
+        assert "ynab" in names
+        assert names == sorted(names)
+
+    def test_get_tool_union_openapi(self, tmp_path) -> None:
+        """get_tool_union() returns OpenAPIToolset for registered OpenAPI tools."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        mock_toolset = MagicMock()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = mock_toolset
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        result = registry.get_tool_union("ynab")
+        assert result is mock_toolset
+
+    def test_get_tool_union_custom(self) -> None:
+        """get_tool_union() returns FunctionTool for custom platform tools."""
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        result = registry.get_tool_union("dummy_tool")
+        assert isinstance(result, FunctionTool)
+
+    def test_get_tool_union_builtin(self) -> None:
+        """get_tool_union() resolves ADK built-in tools."""
+        registry = ToolRegistry()
+        result = registry.get_tool_union("exit_loop")
+        assert result is not None
+
+    def test_get_tool_union_unknown_raises(self) -> None:
+        """get_tool_union() raises KeyError for unknown tools."""
+        registry = ToolRegistry()
+        with pytest.raises(KeyError, match="Unknown tool"):
+            registry.get_tool_union("nonexistent")
+
+    def test_resolve_tools_mixed(self, tmp_path) -> None:
+        """resolve_tools() returns mixed list of FunctionTool and OpenAPIToolset."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        mock_toolset = MagicMock()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = mock_toolset
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        tools = registry.resolve_tools(["dummy_tool", "ynab"])
+        assert len(tools) == 2
+        assert isinstance(tools[0], FunctionTool)
+        assert tools[1] is mock_toolset
+
+    def test_resolve_tools_dict_creates_filtered_toolset(self, tmp_path) -> None:
+        """resolve_tools() wraps OpenAPI toolset in FilteredToolset for dict refs."""
+        from pyflow.platform.filtered_toolset import FilteredToolset
+
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        mock_toolset = MagicMock()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = mock_toolset
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        tools = registry.resolve_tools([{"ynab": ["get*"]}])
+        assert len(tools) == 1
+        assert isinstance(tools[0], FilteredToolset)
+
+    def test_resolve_tools_mixed_strings_and_dicts(self, tmp_path) -> None:
+        """resolve_tools() handles mix of string and dict refs."""
+        from pyflow.platform.filtered_toolset import FilteredToolset
+
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        mock_toolset = MagicMock()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = mock_toolset
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        tools = registry.resolve_tools(["dummy_tool", {"ynab": ["get*"]}])
+        assert len(tools) == 2
+        assert isinstance(tools[0], FunctionTool)
+        assert isinstance(tools[1], FilteredToolset)
+
+    def test_resolve_tools_dict_unknown_raises(self) -> None:
+        """resolve_tools() raises KeyError for dict refs to non-OpenAPI tools."""
+        registry = ToolRegistry()
+        with pytest.raises(KeyError, match="Filtered tool 'nonexistent'"):
+            registry.resolve_tools([{"nonexistent": ["get*"]}])
+
+    def test_resolve_tools_bare_string_returns_full_toolset(self, tmp_path) -> None:
+        """resolve_tools() returns full OpenAPIToolset for bare string refs (backwards-compat)."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        mock_toolset = MagicMock()
+        configs = {"ynab": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = mock_toolset
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        tools = registry.resolve_tools(["ynab"])
+        assert len(tools) == 1
+        assert tools[0] is mock_toolset
+
+    def test_custom_takes_priority_over_openapi(self, tmp_path) -> None:
+        """Custom tools take priority over OpenAPI tools with same name."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        registry.register(_DummyTool)
+        configs = {"dummy_tool": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        # Custom tool should win
+        result = registry.get_tool_union("dummy_tool")
+        assert isinstance(result, FunctionTool)
+
+    def test_register_passes_name_prefix(self, tmp_path) -> None:
+        """register_openapi_tools() passes tool_name_prefix when name_prefix is set."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {"myapi": OpenApiToolConfig(spec="spec.yaml", name_prefix="pfx")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        call_kwargs = MockToolset.call_args[1]
+        assert call_kwargs["tool_name_prefix"] == "pfx"
+
+    def test_register_passes_tool_filter_list(self, tmp_path) -> None:
+        """register_openapi_tools() passes tool_filter list as-is."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {
+            "myapi": OpenApiToolConfig(
+                spec="spec.yaml", tool_filter=["getUsers", "createUser"]
+            )
+        }
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        call_kwargs = MockToolset.call_args[1]
+        assert call_kwargs["tool_filter"] == ["getUsers", "createUser"]
+
+    def test_register_passes_tool_filter_fqn(self, tmp_path) -> None:
+        """register_openapi_tools() resolves FQN string tool_filter to a callable."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {
+            "myapi": OpenApiToolConfig(spec="spec.yaml", tool_filter="os.path.exists")
+        }
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        call_kwargs = MockToolset.call_args[1]
+        assert callable(call_kwargs["tool_filter"])
+
+    def test_register_skips_none_prefix_and_filter(self, tmp_path) -> None:
+        """register_openapi_tools() omits prefix and filter when None."""
+        spec_file = tmp_path / "spec.yaml"
+        spec_file.write_text("openapi: '3.0.0'")
+
+        registry = ToolRegistry()
+        configs = {"myapi": OpenApiToolConfig(spec="spec.yaml")}
+
+        with patch(
+            "google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset.OpenAPIToolset"
+        ) as MockToolset:
+            MockToolset.return_value = MagicMock()
+            registry.register_openapi_tools(configs, base_dir=tmp_path)
+
+        call_kwargs = MockToolset.call_args[1]
+        assert "tool_name_prefix" not in call_kwargs
+        assert "tool_filter" not in call_kwargs

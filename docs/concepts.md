@@ -90,7 +90,7 @@ class MyTool(BasePlatformTool):
 
     async def execute(self, tool_context, param1: str, param2: int = 0) -> dict:
         # ... implementation
-        return {"result": "done"}
+        return {"status": "success", "result": "done", "error": None}
 ```
 
 Tools can be used in two ways:
@@ -329,7 +329,7 @@ Make HTTP requests to external APIs. Includes SSRF protection that blocks reques
 | `timeout` | `int` | `30` | Request timeout in seconds (1-300) |
 | `allow_private` | `bool` | `False` | Allow requests to private network addresses |
 
-**Returns:** `{"status": int, "headers": dict, "body": str|dict}` or `{"status": 0, "error": str}` on failure.
+**Returns:** `{"status": "success", "status_code": int, "headers": dict, "body": str|dict, "error": null}` or `{"status": "error", "status_code": 0, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -365,7 +365,7 @@ Apply a JSONPath expression to extract or transform data from JSON input. Powere
 | `input_data` | `str` | *(required)* | JSON string to transform |
 | `expression` | `str` | *(required)* | JSONPath expression (e.g. `$.name`, `$.items[*].id`) |
 
-**Returns:** `{"result": value}` for single match, `{"result": [values]}` for multiple matches, `{"result": null}` for no matches, or `{"result": null, "error": str}` on failure.
+**Returns:** `{"status": "success", "result": value, "error": null}` for single match, `{"status": "success", "result": [values], "error": null}` for multiple matches, `{"status": "success", "result": null, "error": null}` for no matches, or `{"status": "error", "result": null, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -400,7 +400,7 @@ Evaluate a boolean expression safely within an AST-validated sandbox. Returns `t
 |-----------|------|---------|-------------|
 | `expression` | `str` | *(required)* | A Python boolean expression (e.g. `1 + 1 == 2`, `x > 5 and y < 10`) |
 
-**Returns:** `{"result": bool}` or `{"result": false, "error": str}` on failure.
+**Returns:** `{"status": "success", "result": bool, "error": null}` or `{"status": "error", "result": false, "error": str}` on failure.
 
 **Available builtins:** `abs`, `all`, `any`, `bool`, `float`, `int`, `len`, `max`, `min`, `round`, `sorted`, `str`, `sum`, `tuple`, `list`, `True`, `False`, `None`.
 
@@ -427,7 +427,7 @@ Send alert messages to a webhook URL via HTTP POST. Includes SSRF protection.
 | `webhook_url` | `str` | *(required)* | The webhook URL to POST the alert to |
 | `message` | `str` | *(required)* | The alert message to send |
 
-**Returns:** `{"status": int, "sent": bool, "error": str|null}`.
+**Returns:** `{"status": "success", "status_code": int, "sent": true, "error": null}` or `{"status": "error", "status_code": 0, "sent": false, "error": str}`.
 
 The alert is sent as `{"message": "your message"}` in the POST body.
 
@@ -466,7 +466,7 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 | `action` | `str` | `"read"` | One of `read`, `write`, `append` |
 | `data` | `str` | `""` | Data to write/append (JSON string for structured data, plain text otherwise) |
 
-**Returns:** `{"content": str|null, "success": bool}` or `{"content": null, "success": false, "error": str}` on failure.
+**Returns:** `{"status": "success", "content": str, "error": null}` or `{"status": "error", "content": null, "error": str}` on failure.
 
 **LLM agent example:**
 ```yaml
@@ -492,86 +492,84 @@ Read, write, or append data to local JSON/text files. Creates parent directories
 
 ---
 
-### `ynab` — YNAB Budget API
+### OpenAPI Tools
 
-Interact with the YNAB (You Need A Budget) API. Manage budgets, accounts, categories, payees, transactions, scheduled transactions, and budget months. Requires `PYFLOW_YNAB_API_TOKEN` environment variable or `ynab_api_token` in platform secrets.
+OpenAPI specs are defined at the project level in `pyflow.yaml`, not in individual workflow YAML files. Each spec is registered by name in the `ToolRegistry` at boot, and agents reference them like any other tool via `tools: [name]`.
 
-**Parameters:**
+**Project-level config (`pyflow.yaml` at project root):**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `action` | `str` | *(required)* | The operation to perform (see actions table below) |
-| `budget_id` | `str` | `""` | YNAB budget ID (required for most actions) |
-| `account_id` | `str` | `""` | YNAB account ID |
-| `category_id` | `str` | `""` | YNAB category ID |
-| `payee_id` | `str` | `""` | YNAB payee ID |
-| `transaction_id` | `str` | `""` | YNAB transaction ID |
-| `scheduled_transaction_id` | `str` | `""` | YNAB scheduled transaction ID |
-| `month` | `str` | `""` | Budget month in YYYY-MM-DD format (first day of month) |
-| `data` | `str` | `"{}"` | JSON string for create/update payloads |
-| `since_date` | `str` | `""` | Filter transactions since this date (YYYY-MM-DD) |
-| `type_filter` | `str` | `""` | Filter transaction type (`uncategorized`, `unapproved`) |
-
-**Actions:**
-
-| Action | HTTP | Description |
-|--------|------|-------------|
-| `list_budgets` | GET | List all budgets |
-| `get_budget` | GET | Get budget details |
-| `list_accounts` | GET | List accounts in a budget |
-| `get_account` | GET | Get account details |
-| `list_categories` | GET | List categories |
-| `get_category` | GET | Get category details |
-| `update_category` | PATCH | Update category (budgeted amount, etc.) |
-| `list_payees` | GET | List payees |
-| `update_payee` | PATCH | Update payee name |
-| `list_transactions` | GET | List transactions (supports `since_date`, `type_filter`) |
-| `get_transaction` | GET | Get transaction details |
-| `create_transaction` | POST | Create transaction(s) |
-| `update_transaction` | PATCH | Update transaction(s) |
-| `list_scheduled_transactions` | GET | List scheduled transactions |
-| `create_scheduled_transaction` | POST | Create scheduled transaction |
-| `update_scheduled_transaction` | PUT | Update scheduled transaction |
-| `delete_scheduled_transaction` | DELETE | Delete scheduled transaction |
-| `list_months` | GET | List budget months |
-| `get_month_category` | GET | Get category details for a specific month |
-
-**Returns:** `{"success": true, "data": {...}}` on success, `{"success": false, "error": "message"}` on failure.
-
-**Setup:**
-```bash
-# Set your YNAB API token (get one at https://app.ynab.com/settings/developer)
-echo 'PYFLOW_YNAB_API_TOKEN=your-token-here' >> .env
-```
-
-**ToolAgent example:**
 ```yaml
-- name: list_budgets
-  type: tool
-  tool: ynab
-  tool_config:
-    action: list_budgets
-  output_key: budgets
-
-- name: get_transactions
-  type: tool
-  tool: ynab
-  tool_config:
-    action: list_transactions
-    budget_id: "{budget_id}"
-    since_date: "2024-01-01"
-  output_key: transactions
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
 ```
 
-**LLM agent example:**
+**Agent usage (in `workflow.yaml`):**
+
 ```yaml
-- name: budget_assistant
-  type: llm
-  model: gemini-2.5-flash
-  instruction: "Help the user check their YNAB budget. List their budgets first, then get transactions for the requested budget."
-  tools: [ynab]
-  output_key: budget_info
+agents:
+  # All operations from the spec
+  - name: editor
+    type: llm
+    model: gemini-2.5-flash
+    instruction: "Help the user manage their budget"
+    tools: [ynab]
+    output_key: budget_info
+
+  # Filtered: only GET operations (per-agent glob patterns)
+  - name: analyst
+    type: llm
+    model: gemini-2.5-flash
+    instruction: "Answer questions about the user's budget"
+    tools:
+      - ynab: ["get*"]
+    output_key: analysis
 ```
+
+The agent doesn't know it's backed by an OpenAPI spec — it just uses `ynab` like any other tool name. The `ToolRegistry` handles the 4-tier resolution: custom tools > OpenAPI toolsets > ADK built-ins > FQN import.
+
+**Filtering operations:** Large OpenAPI specs can expose dozens of operations. Use per-agent glob patterns to limit which operations an agent sees — reduces token usage by limiting the tool schemas sent to the LLM.
+
+The `tools` list accepts two formats:
+
+- **String** — `ynab` — all operations from the spec (no filtering)
+- **Dict with glob patterns** — `{ynab: ["get*"]}` — only operations matching any pattern (uses `fnmatch`)
+
+```yaml
+tools:
+  - http_request                  # string: normal platform tool
+  - ynab                          # string: OpenAPI, all operations
+  - ynab: ["get*"]               # dict: OpenAPI with glob filter (GET only)
+  - stripe: ["list*", "get*"]    # dict: multiple glob patterns
+```
+
+Filtering happens at the agent level via `FilteredToolset`, a lightweight wrapper around the shared `OpenAPIToolset`. The spec is parsed once at boot; per-agent wrappers are cheap. Different agents in the same workflow can use different subsets of the same API.
+
+Without filtering (bare string), all operations from the spec are available (default). Operation names are snake_case versions of the `operationId` in the spec.
+
+**OpenAPI tool config fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spec` | `str` | Path to OpenAPI spec file (relative to project root) |
+| `name_prefix` | `str \| null` | Optional prefix for generated tool names (→ ADK `tool_name_prefix`) |
+| `tool_filter` | `list[str] \| str \| null` | Optional project-level filter: list = whitelist of operation names, string = FQN predicate callable (→ ADK `tool_filter`) |
+| `auth` | `OpenApiAuthConfig` | Authentication config (see below) |
+
+**Auth types:**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `bearer` | `token_env` | Bearer token from env var |
+| `apikey` | `token_env`, `apikey_location`, `apikey_name` | API key in header or query param |
+| `oauth2` | `authorization_url`, `token_url`, `scopes`, `client_id_env`, `client_secret_env` | OAuth 2.0 authorization code flow |
+| `service_account` | `service_account_env`, `service_account_scopes` | GCP service account JSON key from env var + OAuth scopes |
+| `none` *(default)* | — | No authentication |
+
+Each operation in the OpenAPI spec becomes a callable tool. The spec path is resolved relative to the project root (parent of the `agents/` directory).
 
 ---
 
@@ -612,7 +610,7 @@ Any Python callable can be referenced as a tool using its dotted module path. Th
 tools: [http_request, mypackage.tools.custom_search]
 ```
 
-Resolution order: custom platform tools > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`.
+Resolution order: custom platform tools > OpenAPI toolsets > ADK built-in tools > FQN import. If the name contains a `.`, PyFlow attempts to import it as a Python module path and wrap it as a `FunctionTool`. A warning is emitted at resolution time if the function's first parameter is not `tool_context` (since ADK injects this automatically).
 
 ### Creating Custom Tools
 
@@ -649,8 +647,10 @@ class MyTool(BasePlatformTool):
             param2: Description of param2.
         """
         # ... implementation
-        return {"result": "done"}
+        return {"status": "success", "result": "done", "error": None}
 ```
+
+All platform tools return standardized dicts with `"status": "success"|"error"` and `"error": str|null` keys. For HTTP tools, use `"status_code"` for the HTTP code (not `"status"`).
 
 The tool is immediately available as `my_tool` in any workflow — no registration code needed. ADK's `FunctionTool` inspects the `execute()` signature to generate the tool schema for the LLM.
 
@@ -671,7 +671,7 @@ class MyApiTool(BasePlatformTool):
     async def execute(self, tool_context: ToolContext, query: str) -> dict:
         token = get_secret("my_api_token")  # reads PYFLOW_MY_API_TOKEN
         if not token:
-            return {"success": False, "error": "API token not configured"}
+            return {"status": "error", "error": "API token not configured"}
         # ... use token
 ```
 
@@ -747,8 +747,6 @@ runtime:
   session_db_path: null
   # MCP server connections
   mcp_servers: []
-  # OpenAPI tool generation
-  openapi_tools: []
 ```
 
 ### Session Service
@@ -821,7 +819,7 @@ from pyflow.tools.base import get_secret
 token = get_secret("ynab_api_token")  # reads PYFLOW_YNAB_API_TOKEN
 ```
 
-This is what all current platform tools use (`ynab`, `http_request` with auth headers, `alert`). No runtime config needed.
+This is what all current platform tools use (`http_request` with auth headers, `alert`). No runtime config needed.
 
 #### `credential_service` — OAuth and dynamic credentials (advanced)
 
@@ -924,19 +922,6 @@ runtime:
 ```
 
 MCP server tools become available by name in any agent's `tools:` list. Supports SSE and stdio transports.
-
-### OpenAPI Tools
-
-Auto-generate tools from OpenAPI specifications:
-
-```yaml
-runtime:
-  openapi_tools:
-    - spec: "specs/petstore.yaml"
-      name_prefix: "petstore"
-```
-
-Each operation in the spec becomes a callable tool, available by name (with optional prefix) in any agent's `tools:` list.
 
 ---
 
@@ -1119,7 +1104,7 @@ agents:                              # required, list of agent configs
     # LLM fields:
     model: gemini-2.5-flash
     instruction: "What the LLM should do"
-    tools: [http_request, condition]
+    tools: [http_request, condition]    # strings or dicts: [{ynab: ["get*"]}]
     description: "Agent purpose for routing"  # optional
     include_contents: default        # default | none
     output_schema:                   # optional, JSON Schema -> enforces structured output

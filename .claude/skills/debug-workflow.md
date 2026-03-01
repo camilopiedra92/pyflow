@@ -169,7 +169,7 @@ pyflow list --tools
 ```
 
 Check:
-1. Is the tool name spelled correctly? Available: `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab` (plus any custom tools)
+1. Is the tool name spelled correctly? Available: `http_request`, `transform`, `condition`, `alert`, `storage` (plus workflow-level OpenAPI tools and any custom tools)
 2. If it's a custom tool, does the file exist in `pyflow/tools/`?
 3. Does the custom tool class have `name = "exact_name"` as a class-level string?
 4. Is the tool module importable? Try: `python -c "import pyflow.tools.<module_name>"`
@@ -195,7 +195,7 @@ Check:
 
 ### Tool secret not configured / "API token not configured"
 
-**"API token not configured"** or tool returns `{"success": false, "error": "...token..."}` — The tool's `get_secret()` call can't find the secret.
+**"API token not configured"** or tool returns `{"status": "error", "error": "...token..."}` — The tool's `get_secret()` call can't find the secret.
 
 Check:
 1. Is the env var named correctly? `get_secret("ynab_api_token")` reads `PYFLOW_YNAB_API_TOKEN` (uppercased, `PYFLOW_` prefix)
@@ -316,7 +316,7 @@ Error occurs
 │
 ├── Runs but wrong output?
 │   ├── Empty result → Check output_key on final agent
-│   ├── "token not configured" → Check PYFLOW_{NAME} in .env (get_secret)
+│   ├── "status": "error" with token message → Check PYFLOW_{NAME} in .env (get_secret)
 │   ├── Wrong date → Check PYFLOW_TIMEZONE, reinforce date in instruction
 │   ├── ResourceExhausted → Filter data (since_date), use PlanReAct
 │   ├── Missing state between agents → Verify key names match
@@ -338,7 +338,7 @@ Platform tools:
   condition              — Safe boolean expression evaluation
   alert                  — Webhook notifications
   storage                — Local file read/write/append
-  ynab                   — YNAB budget API (19 actions, requires PYFLOW_YNAB_API_TOKEN)
+  (+ workflow-level OpenAPI tools, e.g. ynab via openapi_tools: in YAML)
 
 ADK built-in tools:
   exit_loop              — Signal loop completion

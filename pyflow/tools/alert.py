@@ -24,11 +24,21 @@ class AlertTool(BasePlatformTool):
             message: The alert message to send.
         """
         if is_private_url(webhook_url):
-            return {"status": 0, "sent": False, "error": "SSRF blocked: private/internal URL"}
+            return {
+                "status": "error",
+                "status_code": 0,
+                "sent": False,
+                "error": "SSRF blocked: private/internal URL",
+            }
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(webhook_url, json={"message": message})
-                return {"status": resp.status_code, "sent": True, "error": None}
+                return {
+                    "status": "success",
+                    "status_code": resp.status_code,
+                    "sent": True,
+                    "error": None,
+                }
         except httpx.HTTPError as exc:
-            return {"status": 0, "sent": False, "error": str(exc)}
+            return {"status": "error", "status_code": 0, "sent": False, "error": str(exc)}

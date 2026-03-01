@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from pyflow.models.a2a import AgentCard
+from pyflow.models.agent import OpenApiToolConfig
 from pyflow.models.platform import PlatformConfig
+from pyflow.models.project import ProjectConfig
 from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
-from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.app import PyFlowPlatform
 from pyflow.tools.base import get_secret, clear_secrets
 
@@ -69,11 +70,87 @@ async def test_boot_lifecycle() -> None:
     p.workflows.discover = MagicMock()
     p.workflows.hydrate = MagicMock()
 
-    await p.boot()
+    with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+        await p.boot()
 
     p.tools.discover.assert_called_once()
     p.workflows.discover.assert_called_once_with(Path(p.config.workflows_dir))
     p.workflows.hydrate.assert_called_once_with(p.tools)
+
+
+@pytest.mark.asyncio
+async def test_boot_registers_openapi_tools() -> None:
+    """boot() registers OpenAPI tools from pyflow.yaml before hydration."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    openapi_configs = {"ynab": OpenApiToolConfig(spec="specs/ynab.yaml")}
+    project_config = ProjectConfig(openapi_tools=openapi_configs)
+
+    p.tools.discover = MagicMock()
+    p.tools.register_openapi_tools = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.hydrate = MagicMock()
+
+    with patch.object(ProjectConfig, "from_yaml", return_value=project_config):
+        await p.boot()
+
+    # base_dir should be project_root (parent of workflows_dir)
+    expected_base = Path(p.config.workflows_dir).parent
+    p.tools.register_openapi_tools.assert_called_once_with(
+        openapi_configs, expected_base
+    )
+
+
+@pytest.mark.asyncio
+async def test_boot_skips_when_no_openapi_tools() -> None:
+    """boot() skips registration when pyflow.yaml has no openapi_tools."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    p.tools.discover = MagicMock()
+    p.tools.register_openapi_tools = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.hydrate = MagicMock()
+
+    with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+        await p.boot()
+
+    p.tools.register_openapi_tools.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_boot_loads_pyflow_yaml_from_project_root() -> None:
+    """boot() loads pyflow.yaml from project_root (parent of workflows_dir)."""
+    p = PyFlowPlatform(PlatformConfig(workflows_dir="agents", load_dotenv=False))
+
+    p.tools.discover = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.hydrate = MagicMock()
+
+    with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()) as mock_load:
+        await p.boot()
+
+    expected_path = Path("agents").parent / "pyflow.yaml"
+    mock_load.assert_called_once_with(expected_path)
+
+
+@pytest.mark.asyncio
+async def test_boot_stores_project_config() -> None:
+    """boot() stores the loaded ProjectConfig on self.project."""
+    p = PyFlowPlatform(PlatformConfig(load_dotenv=False))
+
+    openapi_configs = {"ynab": OpenApiToolConfig(spec="specs/ynab.yaml")}
+    project_config = ProjectConfig(openapi_tools=openapi_configs)
+
+    p.tools.discover = MagicMock()
+    p.tools.register_openapi_tools = MagicMock()
+    p.workflows.discover = MagicMock()
+    p.workflows.hydrate = MagicMock()
+
+    with patch.object(ProjectConfig, "from_yaml", return_value=project_config):
+        await p.boot()
+
+    assert p.project is project_config
+    assert "ynab" in p.project.openapi_tools
 
 
 @pytest.mark.asyncio
@@ -85,7 +162,8 @@ async def test_boot_sets_booted_flag() -> None:
     p.workflows.hydrate = MagicMock()
 
     assert p.is_booted is False
-    await p.boot()
+    with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+        await p.boot()
     assert p.is_booted is True
 
 
@@ -99,7 +177,8 @@ async def test_boot_generates_agent_cards() -> None:
     p.workflows.hydrate = MagicMock()
     p.workflows.list_workflows = MagicMock(return_value=[])
 
-    await p.boot()
+    with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+        await p.boot()
 
     assert p._agent_cards == []
 
@@ -247,7 +326,8 @@ class TestBootInjectsSecrets:
         p.workflows.discover = MagicMock()
         p.workflows.hydrate = MagicMock()
 
-        await p.boot()
+        with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+            await p.boot()
 
         assert get_secret("ynab_api_token") == "test-token"
 
@@ -258,6 +338,7 @@ class TestBootInjectsSecrets:
         p.workflows.discover = MagicMock()
         p.workflows.hydrate = MagicMock()
 
-        await p.boot()
+        with patch.object(ProjectConfig, "from_yaml", return_value=ProjectConfig()):
+            await p.boot()
 
         assert get_secret("nonexistent") is None

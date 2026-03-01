@@ -5,6 +5,35 @@ from typing import Any, Literal
 from pydantic import BaseModel, model_validator
 
 
+class OpenApiAuthConfig(BaseModel):
+    """Authentication configuration for OpenAPI toolsets."""
+
+    type: Literal["none", "bearer", "apikey", "oauth2", "service_account"] = "none"
+    # bearer: env var containing the token
+    token_env: str | None = None
+    # apikey
+    apikey_location: Literal["header", "query"] = "query"
+    apikey_name: str = "apikey"
+    # oauth2: authorization code flow
+    authorization_url: str | None = None
+    token_url: str | None = None
+    scopes: dict[str, str] | None = None
+    client_id_env: str | None = None
+    client_secret_env: str | None = None
+    # service_account: GCP service account JSON key
+    service_account_env: str | None = None
+    service_account_scopes: list[str] | None = None
+
+
+class OpenApiToolConfig(BaseModel):
+    """Configuration for auto-generating tools from an OpenAPI spec."""
+
+    spec: str
+    name_prefix: str | None = None
+    tool_filter: list[str] | str | None = None
+    auth: OpenApiAuthConfig = OpenApiAuthConfig()
+
+
 class AgentConfig(BaseModel):
     """Configuration for an agent within a workflow."""
 
@@ -12,7 +41,7 @@ class AgentConfig(BaseModel):
     type: Literal["llm", "sequential", "parallel", "loop", "code", "tool", "expr"]
     model: str | None = None
     instruction: str | None = None
-    tools: list[str] = []
+    tools: list[str | dict[str, list[str]]] = []
     output_key: str | None = None
     sub_agents: list[str] | None = None
     callbacks: dict[str, str] | None = None

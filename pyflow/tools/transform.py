@@ -24,17 +24,17 @@ class TransformTool(BasePlatformTool):
         """
         parsed = safe_json_parse(input_data)
         if parsed is None:
-            return {"result": None, "error": "Invalid JSON input"}
+            return {"status": "error", "result": None, "error": "Invalid JSON input"}
 
         try:
             from jsonpath_ng import parse as jp_parse
 
             matches = jp_parse(expression).find(parsed)
         except Exception as exc:
-            return {"result": None, "error": f"JSONPath error: {exc}"}
+            return {"status": "error", "result": None, "error": f"JSONPath error: {exc}"}
 
         if not matches:
-            return {"result": None}
+            return {"status": "success", "result": None, "error": None}
         if len(matches) == 1:
-            return {"result": matches[0].value}
-        return {"result": [m.value for m in matches]}
+            return {"status": "success", "result": matches[0].value, "error": None}
+        return {"status": "success", "result": [m.value for m in matches], "error": None}

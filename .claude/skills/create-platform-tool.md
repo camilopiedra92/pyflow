@@ -62,22 +62,28 @@ Parameters on `execute()` are the tool's public API. The LLM sees them as functi
 
 ### Return Format
 
-Always return a `dict`. Follow the conventions established by existing tools:
+Always return a `dict`. All platform tools use a **standardized return dict** with consistent `status` and `error` keys:
 
-- **Success**: include the primary result and relevant metadata
-- **Error**: include an `"error"` key with a human-readable message
+- **`"status"`**: `"success"` or `"error"` — always present
+- **`"error"`**: `str` on error, `None` on success — always present
+- **Tool-specific keys**: the actual data (e.g. `"result"`, `"body"`, `"content"`)
 - Never raise exceptions to the caller — catch and return error dicts
+- For HTTP tools, use `"status_code"` for the HTTP status code (not `"status"`, which is reserved for success/error)
 
 Examples from existing tools:
 ```python
-# Success
-return {"status": 200, "headers": dict(resp.headers), "body": resp_body}
-# Error
-return {"status": 0, "error": "SSRF blocked: private/internal URL"}
-# Success with flag
-return {"content": text, "success": True}
-# Error with flag
-return {"content": None, "success": False, "error": "File not found"}
+# HTTP success
+return {"status": "success", "status_code": 200, "headers": dict(resp.headers), "body": resp_body, "error": None}
+# HTTP error
+return {"status": "error", "status_code": 0, "error": "SSRF blocked: private/internal URL"}
+# Data processing success
+return {"status": "success", "result": value, "error": None}
+# Data processing error
+return {"status": "error", "result": None, "error": "Invalid JSON input"}
+# File I/O success
+return {"status": "success", "content": text, "error": None}
+# File I/O error
+return {"status": "error", "content": None, "error": "File not found"}
 ```
 
 ## Step 2: Write the Tool
@@ -110,9 +116,9 @@ class MyTool(BasePlatformTool):
         """
         try:
             # ... implementation
-            return {"result": "value", "success": True}
+            return {"status": "success", "result": "value", "error": None}
         except Exception as exc:
-            return {"result": None, "success": False, "error": str(exc)}
+            return {"status": "error", "result": None, "error": str(exc)}
 ```
 
 ### Reuse Platform Utilities
@@ -141,7 +147,7 @@ parsed_body = safe_json_parse(body)  # returns None on invalid JSON
 from pyflow.tools.security import is_private_url
 
 if is_private_url(url):
-    return {"status": 0, "error": "SSRF blocked: private/internal URL"}
+    return {"status": "error", "status_code": 0, "error": "SSRF blocked: private/internal URL"}
 ```
 
 ### Security Rules
@@ -171,7 +177,7 @@ class MyApiTool(BasePlatformTool):
     async def execute(self, tool_context: ToolContext, query: str) -> dict:
         token = get_secret("my_api_token")  # reads PYFLOW_MY_API_TOKEN env var
         if not token:
-            return {"success": False, "error": "API token not configured. Set PYFLOW_MY_API_TOKEN."}
+            return {"status": "error", "error": "API token not configured. Set PYFLOW_MY_API_TOKEN."}
         # ... use token in Authorization header
 ```
 
@@ -231,7 +237,8 @@ class TestMyToolExecute:
             required_param="value",
         )
         assert isinstance(result, dict)
-        assert result["success"] is True
+        assert result["status"] == "success"
+        assert result["error"] is None
 
     async def test_error_handling(self):
         tool = MyTool()
@@ -239,8 +246,8 @@ class TestMyToolExecute:
             tool_context=MagicMock(),
             required_param="bad_value",
         )
-        assert result["success"] is False
-        assert "error" in result
+        assert result["status"] == "error"
+        assert result["error"]
 
     def test_auto_registered(self):
         from pyflow.tools.base import get_registered_tools
@@ -321,25 +328,29 @@ ruff check                                     # lint clean
 ## Common Patterns
 
 ### HTTP API Client Tool
-If the tool wraps an external API (like YnabTool), follow this pattern:
+If the tool wraps an external API, follow this pattern:
 - Use `httpx.AsyncClient` with a timeout
 - Use `get_secret("api_token")` for authentication — reads `PYFLOW_API_TOKEN` env var
 - Return early with error dict if token is missing
 - Parse response as JSON, check status code for API errors
-- Return `{"success": True, "data": {...}}` on success, `{"success": False, "error": msg}` on failure
-- See `pyflow/tools/ynab.py` as reference implementation (action-based dispatch, route table)
+- Return `{"status": "success", "status_code": 200, "data": {...}, "error": None}` on success
+- Return `{"status": "error", "status_code": 0, "error": msg}` on failure
+- Use `"status_code"` for the HTTP code, `"status"` is reserved for `"success"`/`"error"`
+- See `pyflow/tools/http.py` as reference implementation
+- **Alternative:** For APIs with an OpenAPI spec, use workflow-level `openapi_tools` instead of writing a custom tool — the ToolRegistry auto-generates tools from the spec at boot
 
 ### Data Processing Tool
 If the tool transforms data (like TransformTool):
 - Accept input as a JSON string parameter
 - Parse with `safe_json_parse()` — return error dict on invalid input
-- Return `{"result": value}` on success, `{"result": None, "error": msg}` on failure
+- Return `{"status": "success", "result": value, "error": None}` on success
+- Return `{"status": "error", "result": None, "error": msg}` on failure
 
 ### File I/O Tool
 If the tool reads/writes files (like StorageTool):
 - Use `pathlib.Path` for path handling
 - Create parent directories with `mkdir(parents=True, exist_ok=True)` on write
-- Return `{"content": data, "success": True}` pattern
+- Return `{"status": "success", "content": data, "error": None}` pattern
 - Handle FileNotFoundError explicitly
 
 ### Stateful Tool (using ToolContext)

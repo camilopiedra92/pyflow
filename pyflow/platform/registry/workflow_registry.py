@@ -20,6 +20,7 @@ class HydratedWorkflow(BaseModel):
 
     definition: WorkflowDef
     agent: Any = None  # Filled by hydrator in Phase 2B
+    package_dir: Path | None = None  # Directory containing workflow.yaml
 
 
 class WorkflowRegistry:
@@ -32,7 +33,9 @@ class WorkflowRegistry:
         """Scan directory for agent packages (subdirs containing workflow.yaml)."""
         for pkg_dir in scan_agent_packages(directory):
             workflow_def = self._load_yaml(pkg_dir / "workflow.yaml")
-            self._workflows[workflow_def.name] = HydratedWorkflow(definition=workflow_def)
+            self._workflows[workflow_def.name] = HydratedWorkflow(
+                definition=workflow_def, package_dir=pkg_dir
+            )
 
     def _load_yaml(self, path: Path) -> WorkflowDef:
         """Load and validate a YAML file into a WorkflowDef."""
@@ -61,8 +64,8 @@ class WorkflowRegistry:
         """Hydrate all workflows by converting WorkflowDefs into ADK agent trees."""
         from pyflow.platform.hydration.hydrator import WorkflowHydrator
 
-        hydrator = WorkflowHydrator(tool_registry)
         for hw in self._workflows.values():
+            hydrator = WorkflowHydrator(tool_registry)
             hw.agent = hydrator.hydrate(hw.definition)
 
     def __len__(self) -> int:

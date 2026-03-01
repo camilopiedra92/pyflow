@@ -1,0 +1,6 @@
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN

@@ -38,13 +38,6 @@ class McpServerConfig(BaseModel):
     env: dict[str, str] | None = None
 
 
-class OpenApiToolConfig(BaseModel):
-    """Configuration for auto-generating tools from an OpenAPI spec."""
-
-    spec: str  # Path to OpenAPI spec file (YAML or JSON)
-    name_prefix: str | None = None
-
-
 class RuntimeConfig(BaseModel):
     """ADK runtime service configuration for a workflow."""
 
@@ -67,8 +60,6 @@ class RuntimeConfig(BaseModel):
     resumable: bool = False
     # MCP tool servers
     mcp_servers: list[McpServerConfig] = []
-    # OpenAPI tool generation
-    openapi_tools: list[OpenApiToolConfig] = []
 
 
 class DagNode(BaseModel):

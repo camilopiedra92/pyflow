@@ -105,7 +105,7 @@ callbacks:
 
 **Platform-injected state:** Every session also has `{current_date}`, `{current_datetime}`, and `{timezone}` available as template variables if you need to reference them explicitly in instructions or tool_config.
 
-**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, `ynab`, plus ADK built-ins (see below), plus any custom tools in `pyflow/tools/`, plus any Python callable via FQN (e.g. `mypackage.tools.custom_search`).
+**Available tools:** `http_request`, `transform`, `condition`, `alert`, `storage`, plus ADK built-ins (see below), plus workflow-level OpenAPI tools (see below), plus any custom tools in `pyflow/tools/`, plus any Python callable via FQN (e.g. `mypackage.tools.custom_search`).
 
 **ADK built-in tools** (available by name in `tools:` list):
 
@@ -588,7 +588,42 @@ orchestration:
 
 A single LLM agent that autonomously decides which tool calls to make. Uses PlanReAct for structured multi-step reasoning.
 
+OpenAPI tools are defined in `pyflow.yaml` at the project root (infrastructure: spec + auth), not in the workflow YAML. Agents reference them by name, with optional per-agent glob filtering.
+
 ```yaml
+# pyflow.yaml (project root) — defines the tool (infrastructure only)
+openapi_tools:
+  ynab:
+    spec: specs/ynab-v1-openapi.yaml
+    name_prefix: ynab           # optional: prefixes all generated tool names
+    tool_filter: ["get*"]       # optional: project-level whitelist (list) or FQN predicate (string)
+    auth:
+      type: bearer
+      token_env: PYFLOW_YNAB_API_TOKEN
+```
+
+**OpenAPI tool config fields:**
+- `spec` — path to OpenAPI spec file (relative to project root)
+- `name_prefix` — optional prefix for generated tool names (→ ADK `tool_name_prefix`)
+- `tool_filter` — optional project-level filter: a list of operation names (whitelist) or a Python FQN string resolving to a predicate callable (→ ADK `tool_filter`)
+- `auth` — authentication config (see auth types below)
+
+**Auth types:** `none` (default), `bearer` (token via env var), `apikey` (header/query), `oauth2` (authorization code flow), `service_account` (GCP SA JSON key via env var + scopes)
+
+```yaml
+# service_account auth example (GCP APIs)
+openapi_tools:
+  sheets:
+    spec: specs/sheets-v4.yaml
+    auth:
+      type: service_account
+      service_account_env: PYFLOW_SA_KEY          # env var with SA JSON
+      service_account_scopes:
+        - https://www.googleapis.com/auth/spreadsheets
+```
+
+```yaml
+# agents/budget_analyst/workflow.yaml — uses the tool with per-agent filtering
 name: budget_analyst
 description: "Answer questions about your YNAB budget"
 
@@ -601,7 +636,7 @@ agents:
       Start by calling list_budgets, then query as needed.
       NEVER call list_transactions without since_date.
     tools:
-      - ynab
+      - ynab: ["get*"]        # only GET operations (glob filter)
     output_key: analysis
 
 orchestration:
@@ -617,6 +652,8 @@ a2a:
       description: "Analyze YNAB budget data"
       tags: [finance, budget]
 ```
+
+**Tool filtering syntax:** `tools: [ynab]` gives all operations; `tools: [{ynab: ["get*"]}]` filters with `fnmatch` glob patterns. Different agents can use different subsets of the same API — filtering is per-agent, not per-spec. Note: per-agent `FilteredToolset` filtering (in workflow YAML) is separate from project-level `tool_filter` (in `pyflow.yaml`).
 
 **Key lesson:** For APIs that return large responses, always instruct the agent to filter (e.g. `since_date`). PlanReAct plans filters before executing, saving tokens vs vanilla ReAct which fetches first.
 

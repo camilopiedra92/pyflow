@@ -31,22 +31,34 @@ class StorageTool(BasePlatformTool):
         try:
             if action == "read":
                 if not file_path.exists():
-                    return {"content": None, "success": False, "error": "File not found"}
-                return {"content": file_path.read_text(encoding="utf-8"), "success": True}
+                    return {
+                        "status": "error",
+                        "content": None,
+                        "error": "File not found",
+                    }
+                return {
+                    "status": "success",
+                    "content": file_path.read_text(encoding="utf-8"),
+                    "error": None,
+                }
             elif action == "write":
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 parsed = safe_json_parse(data)
                 text = json.dumps(parsed) if parsed is not None else data
                 file_path.write_text(text, encoding="utf-8")
-                return {"content": text, "success": True}
+                return {"status": "success", "content": text, "error": None}
             elif action == "append":
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 parsed = safe_json_parse(data)
                 text = json.dumps(parsed) if parsed is not None else data
                 with file_path.open("a", encoding="utf-8") as f:
                     f.write(text)
-                return {"content": text, "success": True}
+                return {"status": "success", "content": text, "error": None}
             else:
-                return {"content": None, "success": False, "error": f"Unknown action: {action}"}
+                return {
+                    "status": "error",
+                    "content": None,
+                    "error": f"Unknown action: {action}",
+                }
         except Exception as exc:
-            return {"content": None, "success": False, "error": str(exc)}
+            return {"status": "error", "content": None, "error": str(exc)}

@@ -172,7 +172,7 @@ class TestMetricsPluginLogging:
     async def test_before_tool_logs_call(self):
         plugin = MetricsPlugin()
         tool = MagicMock()
-        tool.name = "ynab"
+        tool.name = "http_request"
         tool_ctx = MagicMock()
 
         with patch("pyflow.platform.metrics_plugin.logger") as mock_logger:
@@ -182,7 +182,7 @@ class TestMetricsPluginLogging:
             mock_logger.info.assert_called_once()
             call_kwargs = mock_logger.info.call_args
             assert call_kwargs[0][0] == "workflow.tool_call"
-            assert call_kwargs[1]["tool"] == "ynab"
+            assert call_kwargs[1]["tool"] == "http_request"
 
     async def test_after_run_logs_summary(self):
         plugin = MetricsPlugin()

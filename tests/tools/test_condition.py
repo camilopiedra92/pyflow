@@ -21,8 +21,9 @@ class TestConditionToolExecute:
         tool = ConditionTool()
         result = await tool.execute(tool_context=MagicMock(), expression="1 + 1 == 2")
         assert isinstance(result, dict)
+        assert result["status"] == "success"
         assert result["result"] is True
-        assert "error" not in result
+        assert result["error"] is None
 
     async def test_false_expression(self):
         tool = ConditionTool()
@@ -52,36 +53,41 @@ class TestConditionToolExecute:
     async def test_dangerous_import_rejected(self):
         tool = ConditionTool()
         result = await tool.execute(tool_context=MagicMock(), expression=_DANGEROUS_IMPORT)
+        assert result["status"] == "error"
         assert result["result"] is False
-        assert "error" in result
+        assert result["error"]
 
     async def test_dangerous_eval_rejected(self):
         tool = ConditionTool()
         result = await tool.execute(
             tool_context=MagicMock(), expression=_build_dangerous("eval", "'1+1'")
         )
+        assert result["status"] == "error"
         assert result["result"] is False
-        assert "error" in result
+        assert result["error"]
 
     async def test_dangerous_exec_rejected(self):
         tool = ConditionTool()
         result = await tool.execute(
             tool_context=MagicMock(), expression=_build_dangerous("exec", "'print(1)'")
         )
+        assert result["status"] == "error"
         assert result["result"] is False
-        assert "error" in result
+        assert result["error"]
 
     async def test_dangerous_open_rejected(self):
         tool = ConditionTool()
         result = await tool.execute(tool_context=MagicMock(), expression=_DANGEROUS_OPEN)
+        assert result["status"] == "error"
         assert result["result"] is False
-        assert "error" in result
+        assert result["error"]
 
     async def test_syntax_error_returns_error(self):
         tool = ConditionTool()
         result = await tool.execute(tool_context=MagicMock(), expression="if True then")
+        assert result["status"] == "error"
         assert result["result"] is False
-        assert "error" in result
+        assert result["error"]
 
     def test_auto_registered(self):
         from pyflow.tools.base import get_registered_tools

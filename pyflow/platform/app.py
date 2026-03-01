@@ -11,6 +11,7 @@ from pyflow.models.a2a import AgentCard
 from pyflow.models.platform import PlatformConfig
 from pyflow.models.runner import RunResult
 from pyflow.models.tool import ToolMetadata
+from pyflow.models.project import ProjectConfig
 from pyflow.models.workflow import WorkflowDef
 from pyflow.platform.a2a.cards import AgentCardGenerator
 from pyflow.platform.executor import WorkflowExecutor
@@ -100,16 +101,23 @@ class PyFlowPlatform:
         self.tools.discover()
         log.info("tools.discovered", count=len(self.tools))
 
-        # 2. Discover workflows
+        # 2. Register OpenAPI tools from project config
         workflows_path = Path(self.config.workflows_dir)
+        project_root = workflows_path.parent
+        self.project = ProjectConfig.from_yaml(project_root / "pyflow.yaml")
+        if self.project.openapi_tools:
+            self.tools.register_openapi_tools(self.project.openapi_tools, project_root)
+        log.info("openapi_tools.registered")
+
+        # 3. Discover workflows
         self.workflows.discover(workflows_path)
         log.info("workflows.discovered", count=len(self.workflows))
 
-        # 3. Hydrate workflows (resolve tool refs -> ADK agents)
+        # 4. Hydrate workflows (resolve tool refs -> ADK agents)
         self.workflows.hydrate(self.tools)
         log.info("workflows.hydrated")
 
-        # 4. Generate A2A agent cards from workflows with a2a: section
+        # 5. Generate A2A agent cards from workflows with a2a: section
         self._agent_cards = self._a2a.generate_cards(self.workflows.list_workflows())
         log.info("a2a.cards_generated", count=len(self._agent_cards))
 

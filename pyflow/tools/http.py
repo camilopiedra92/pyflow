@@ -33,7 +33,11 @@ class HttpTool(BasePlatformTool):
             allow_private: Allow requests to private network addresses.
         """
         if not allow_private and is_private_url(url):
-            return {"status": 0, "error": "SSRF blocked: private/internal URL"}
+            return {
+                "status": "error",
+                "status_code": 0,
+                "error": "SSRF blocked: private/internal URL",
+            }
 
         timeout = max(1, min(timeout, 300))
         parsed_headers = safe_json_parse(headers, default={})
@@ -52,9 +56,11 @@ class HttpTool(BasePlatformTool):
                 except Exception:
                     resp_body = resp.text
                 return {
-                    "status": resp.status_code,
+                    "status": "success",
+                    "status_code": resp.status_code,
                     "headers": dict(resp.headers),
                     "body": resp_body,
+                    "error": None,
                 }
         except httpx.HTTPError as exc:
-            return {"status": 0, "error": str(exc)}
+            return {"status": "error", "status_code": 0, "error": str(exc)}

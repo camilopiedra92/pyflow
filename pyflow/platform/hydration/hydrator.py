@@ -97,6 +97,7 @@ class WorkflowHydrator:
         """Build an LlmAgent with resolved tools, model, and optional callbacks."""
         model: Union[str, BaseLlm] = self._resolve_model(config.model)
         tools = self._tool_registry.resolve_tools(config.tools) if config.tools else []
+
         callbacks = self._resolve_callbacks(config.callbacks)
 
         instruction = config.instruction or ""
@@ -327,9 +328,17 @@ def build_root_agent(caller_file: str) -> BaseAgent:
     """
     from pyflow.platform.registry.tool_registry import ToolRegistry
 
-    workflow_path = Path(caller_file).parent / "workflow.yaml"
+    workflow_dir = Path(caller_file).parent
+    workflow_path = workflow_dir / "workflow.yaml"
+    # project_root = grandparent of agent package (agents/<name>/ -> project root)
+    project_root = workflow_dir.parent.parent
     tools = ToolRegistry()
     tools.discover()
+    from pyflow.models.project import ProjectConfig
+
     workflow = WorkflowDef.from_yaml(workflow_path)
+    project_config = ProjectConfig.from_yaml(project_root / "pyflow.yaml")
+    if project_config.openapi_tools:
+        tools.register_openapi_tools(project_config.openapi_tools, project_root)
     hydrator = WorkflowHydrator(tools)
     return hydrator.hydrate(workflow)
