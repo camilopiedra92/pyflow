@@ -195,7 +195,7 @@ Check:
 
 ### Tool secret not configured / "API token not configured"
 
-**"API token not configured"** or tool returns `{"success": false, "error": "...token..."}` — The tool's `get_secret()` call can't find the secret.
+**"API token not configured"** or tool returns `{"status": "error", "error": "...token..."}` — The tool's `get_secret()` call can't find the secret.
 
 Check:
 1. Is the env var named correctly? `get_secret("ynab_api_token")` reads `PYFLOW_YNAB_API_TOKEN` (uppercased, `PYFLOW_` prefix)
@@ -316,7 +316,7 @@ Error occurs
 │
 ├── Runs but wrong output?
 │   ├── Empty result → Check output_key on final agent
-│   ├── "token not configured" → Check PYFLOW_{NAME} in .env (get_secret)
+│   ├── "status": "error" with token message → Check PYFLOW_{NAME} in .env (get_secret)
 │   ├── Wrong date → Check PYFLOW_TIMEZONE, reinforce date in instruction
 │   ├── ResourceExhausted → Filter data (since_date), use PlanReAct
 │   ├── Missing state between agents → Verify key names match

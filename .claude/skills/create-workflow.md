@@ -595,9 +595,31 @@ OpenAPI tools are defined in `pyflow.yaml` at the project root (infrastructure: 
 openapi_tools:
   ynab:
     spec: specs/ynab-v1-openapi.yaml
+    name_prefix: ynab           # optional: prefixes all generated tool names
+    tool_filter: ["get*"]       # optional: project-level whitelist (list) or FQN predicate (string)
     auth:
       type: bearer
       token_env: PYFLOW_YNAB_API_TOKEN
+```
+
+**OpenAPI tool config fields:**
+- `spec` — path to OpenAPI spec file (relative to project root)
+- `name_prefix` — optional prefix for generated tool names (→ ADK `tool_name_prefix`)
+- `tool_filter` — optional project-level filter: a list of operation names (whitelist) or a Python FQN string resolving to a predicate callable (→ ADK `tool_filter`)
+- `auth` — authentication config (see auth types below)
+
+**Auth types:** `none` (default), `bearer` (token via env var), `apikey` (header/query), `oauth2` (authorization code flow), `service_account` (GCP SA JSON key via env var + scopes)
+
+```yaml
+# service_account auth example (GCP APIs)
+openapi_tools:
+  sheets:
+    spec: specs/sheets-v4.yaml
+    auth:
+      type: service_account
+      service_account_env: PYFLOW_SA_KEY          # env var with SA JSON
+      service_account_scopes:
+        - https://www.googleapis.com/auth/spreadsheets
 ```
 
 ```yaml
@@ -631,7 +653,7 @@ a2a:
       tags: [finance, budget]
 ```
 
-**Tool filtering syntax:** `tools: [ynab]` gives all operations; `tools: [{ynab: ["get*"]}]` filters with `fnmatch` glob patterns. Different agents can use different subsets of the same API — filtering is per-agent, not per-spec.
+**Tool filtering syntax:** `tools: [ynab]` gives all operations; `tools: [{ynab: ["get*"]}]` filters with `fnmatch` glob patterns. Different agents can use different subsets of the same API — filtering is per-agent, not per-spec. Note: per-agent `FilteredToolset` filtering (in workflow YAML) is separate from project-level `tool_filter` (in `pyflow.yaml`).
 
 **Key lesson:** For APIs that return large responses, always instruct the agent to filter (e.g. `since_date`). PlanReAct plans filters before executing, saving tokens vs vanilla ReAct which fetches first.
 
